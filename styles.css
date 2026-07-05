@@ -1,0 +1,102 @@
+/* ===== Composer — block handle ===== */
+.composer-handle {
+  position: fixed;
+  z-index: var(--layer-popover);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.composer-handle.is-visible {
+  opacity: 1;
+}
+.composer-handle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.composer-handle-btn:hover {
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+}
+.composer-handle-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ===== Composer — insert/actions menu ===== */
+.composer-menu {
+  position: fixed;
+  z-index: var(--layer-menu);
+  min-width: 260px;
+  max-width: 320px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-s);
+}
+.composer-menu-search {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 6px 10px;
+  font-size: var(--font-ui-small);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  color: var(--text-normal);
+  outline: none;
+  box-shadow: none;
+}
+.composer-menu-search:focus {
+  border-bottom-color: var(--interactive-accent);
+  box-shadow: none;
+}
+.composer-menu-list {
+  overflow-y: auto;
+}
+.composer-menu-section {
+  padding: 8px 8px 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.composer-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+.composer-menu-item.is-active {
+  background: var(--background-modifier-hover);
+}
+.composer-menu-item-icon {
+  display: flex;
+  color: var(--text-muted);
+}
+.composer-menu-item-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.composer-menu-empty {
+  padding: 12px 8px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-small);
+}
