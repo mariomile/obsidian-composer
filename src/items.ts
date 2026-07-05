@@ -1,13 +1,12 @@
 import type { App, Editor, MarkdownView, TFile } from 'obsidian';
 import { Notice, normalizePath } from 'obsidian';
 import {
-  insertionEdit, type Block,
   turnInto, duplicateBlock, deleteBlock, moveBlock, ensureBlockId,
-  type TurnTarget,
+  type Block, type TurnTarget,
 } from './block-model.ts';
 import type { ComposerItem } from './menu-core.ts';
-import { BASIC_SNIPPETS } from './snippets.ts';
-import { insertSnippet, applyLineEdit } from './actions.ts';
+import { BASIC_SNIPPETS, type Snippet } from './snippets.ts';
+import { insertSnippet, performEdit, applyLineEdit, resolveBlock } from './actions.ts';
 import {
   FilePicker, mdNotes, imageFiles, canvasFiles, filesInFolder, embedTextFor, baseFiles,
 } from './pickers.ts';
@@ -17,8 +16,9 @@ export interface ItemDeps {
   app: App;
   editor: Editor;
   view: MarkdownView;
-  block: Block;
-  lines: string[];
+  /** Start line of the hovered block — the block itself is re-derived from the
+   *  live document when an item runs (async pickers can outlive the snapshot). */
+  blockLine: number;
   where: 'above' | 'below';
   settings: ComposerSettings;
 }
@@ -33,6 +33,36 @@ const BASE_TEMPLATE = `views:
     name: Table
 `;
 
+/** Resolve the target block from the live document, then run the action.
+ *  Every item goes through here — if the block vanished under an async
+ *  window (picker, vault I/O), the action is cancelled instead of landing
+ *  on shifted lines. */
+function withBlock(
+  deps: ItemDeps,
+  fn: (lines: string[], block: Block) => void | Promise<void>,
+): void | Promise<void> {
+  const target = resolveBlock(deps.editor, deps.blockLine);
+  if (!target) {
+    new Notice('Block not found — the note changed');
+    return;
+  }
+  return fn(target.lines, target.block);
+}
+
+/** Canonical insert path: everything that adds lines goes through a Snippet. */
+function insertLines(deps: ItemDeps, snippet: Snippet): void {
+  void withBlock(deps, (_lines, block) =>
+    insertSnippet(deps.editor, block, snippet, deps.where));
+}
+
+function insertEmbed(deps: ItemDeps, text: string): void {
+  insertLines(deps, { lines: [text], cursor: { line: 0, ch: text.length } });
+}
+
+function pickAndEmbed(deps: ItemDeps, files: TFile[], placeholder: string): void {
+  new FilePicker(deps.app, files, placeholder, (f) => insertEmbed(deps, embedTextFor(f))).open();
+}
+
 async function createBaseFile(app: App, folderPath: string, baseName: string): Promise<TFile> {
   let name = baseName;
   let i = 1;
@@ -40,17 +70,6 @@ async function createBaseFile(app: App, folderPath: string, baseName: string): P
     name = `${baseName} ${++i}`;
   }
   return app.vault.create(normalizePath(`${folderPath}/${name}.base`), BASE_TEMPLATE);
-}
-
-function insertEmbed(deps: ItemDeps, text: string): void {
-  const { edit, firstInsertedLine } = insertionEdit(deps.block, [text], deps.where);
-  applyLineEdit(deps.editor, edit);
-  deps.editor.setCursor({ line: firstInsertedLine, ch: text.length });
-  deps.editor.focus();
-}
-
-function pickAndEmbed(deps: ItemDeps, files: TFile[], placeholder: string): void {
-  new FilePicker(deps.app, files, placeholder, (f) => insertEmbed(deps, embedTextFor(f))).open();
 }
 
 export function insertItems(deps: ItemDeps): ComposerItem[] {
@@ -62,7 +81,7 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
       icon: s.icon,
       section: 'Basic',
       keywords: s.keywords,
-      run: () => insertSnippet(deps.editor, deps.block, s.make(), deps.where),
+      run: () => insertLines(deps, s.make()),
     });
   }
   items.push(
@@ -121,10 +140,7 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
         new FilePicker(deps.app, files, 'Insert template…', (f) => {
           void deps.app.vault.read(f).then((content) => {
             const lines = content.replace(/\n$/, '').split('\n');
-            const { edit, firstInsertedLine } = insertionEdit(deps.block, lines, deps.where);
-            applyLineEdit(deps.editor, edit);
-            deps.editor.setCursor({ line: firstInsertedLine, ch: 0 });
-            deps.editor.focus();
+            insertLines(deps, { lines, cursor: { line: 0, ch: 0 } });
           }).catch(() => {
             new Notice(`Could not read template: ${f.path}`);
           });
@@ -138,14 +154,11 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
     items.push({
       id: 'ask-exo', label: 'Ask Exo', icon: 'sparkles', section: 'AI',
       keywords: ['ai', 'exo', 'assistant'],
-      run: () => {
+      run: () => withBlock(deps, (_lines, block) => {
         // Land the cursor on a fresh line at the insert position, then hand off to Exo.
-        const { edit, firstInsertedLine } = insertionEdit(deps.block, [''], deps.where);
-        applyLineEdit(deps.editor, edit);
-        deps.editor.setCursor({ line: firstInsertedLine, ch: 0 });
-        deps.editor.focus();
+        insertSnippet(deps.editor, block, { lines: [''], cursor: { line: 0, ch: 0 } }, deps.where);
         commands.executeCommandById(deps.settings.exoCommandId);
-      },
+      }),
     });
   }
 
@@ -174,63 +187,49 @@ export function actionItems(deps: ItemDeps): ComposerItem[] {
     items.push({
       id: `turn-${t.target}`, label: t.label, icon: t.icon, section: 'Turn into',
       keywords: ['turn', 'convert', t.target],
-      run: () => {
-        applyLineEdit(deps.editor, turnInto(deps.lines, deps.block, t.target));
-        deps.editor.setCursor({ line: deps.block.startLine, ch: 0 });
-        deps.editor.focus();
-      },
+      run: () => withBlock(deps, (lines, block) =>
+        performEdit(deps.editor, turnInto(lines, block, t.target), { line: block.startLine, ch: 0 })),
     });
   }
+
+  const move = (dir: 'up' | 'down') => () => withBlock(deps, (lines, block) => {
+    const r = moveBlock(lines, block, dir);
+    if (r) performEdit(deps.editor, r.edit, { line: r.cursorLine, ch: 0 });
+  });
 
   items.push(
     {
       id: 'move-up', label: 'Move up', icon: 'arrow-up', section: 'Actions',
       keywords: ['move', 'reorder', 'up'],
-      run: () => {
-        const r = moveBlock(deps.lines, deps.block, 'up');
-        if (!r) return;
-        applyLineEdit(deps.editor, r.edit);
-        deps.editor.setCursor({ line: r.cursorLine, ch: 0 });
-        deps.editor.focus();
-      },
+      run: move('up'),
     },
     {
       id: 'move-down', label: 'Move down', icon: 'arrow-down', section: 'Actions',
       keywords: ['move', 'reorder', 'down'],
-      run: () => {
-        const r = moveBlock(deps.lines, deps.block, 'down');
-        if (!r) return;
-        applyLineEdit(deps.editor, r.edit);
-        deps.editor.setCursor({ line: r.cursorLine, ch: 0 });
-        deps.editor.focus();
-      },
+      run: move('down'),
     },
     {
       id: 'duplicate', label: 'Duplicate', icon: 'copy', section: 'Actions',
       keywords: ['duplicate', 'copy'],
-      run: () => {
-        applyLineEdit(deps.editor, duplicateBlock(deps.lines, deps.block));
-        deps.editor.focus();
-      },
+      run: () => withBlock(deps, (lines, block) =>
+        performEdit(deps.editor, duplicateBlock(lines, block))),
     },
     {
       id: 'copy-link', label: 'Copy block link', icon: 'link', section: 'Actions',
       keywords: ['link', 'block', 'reference'],
-      run: async () => {
-        const { edit, id } = ensureBlockId(deps.lines, deps.block, randomBlockId);
+      run: () => withBlock(deps, async (lines, block) => {
+        const { edit, id } = ensureBlockId(lines, block, randomBlockId);
         if (edit) applyLineEdit(deps.editor, edit);
         const basename = deps.view.file?.basename ?? '';
         await navigator.clipboard.writeText(`[[${basename}#^${id}]]`);
         new Notice('Block link copied');
-      },
+      }),
     },
     {
       id: 'delete', label: 'Delete', icon: 'trash-2', section: 'Actions',
       keywords: ['delete', 'remove'],
-      run: () => {
-        applyLineEdit(deps.editor, deleteBlock(deps.lines, deps.block));
-        deps.editor.focus();
-      },
+      run: () => withBlock(deps, (lines, block) =>
+        performEdit(deps.editor, deleteBlock(lines, block))),
     },
   );
 

@@ -1,5 +1,5 @@
 import type { Editor } from 'obsidian';
-import { insertionEdit, type Block, type LineEdit } from './block-model.ts';
+import { blockAtLine, insertionEdit, type Block, type LineEdit } from './block-model.ts';
 import type { Snippet } from './snippets.ts';
 
 /** Apply a LineEdit as ONE replaceRange (single undo step). */
@@ -35,14 +35,31 @@ export function applyLineEdit(editor: Editor, edit: LineEdit): void {
     { line: edit.toLine, ch: editor.getLine(edit.toLine).length });
 }
 
+/** Apply + optional cursor + focus — the standard postlude of every mutation. */
+export function performEdit(
+  editor: Editor, edit: LineEdit, cursor?: { line: number; ch: number },
+): void {
+  applyLineEdit(editor, edit);
+  if (cursor) editor.setCursor(cursor);
+  editor.focus();
+}
+
 export function insertSnippet(
   editor: Editor, block: Block, snippet: Snippet, where: 'above' | 'below',
 ): void {
   const { edit, firstInsertedLine } = insertionEdit(block, snippet.lines, where);
-  applyLineEdit(editor, edit);
-  editor.setCursor({
+  performEdit(editor, edit, {
     line: firstInsertedLine + snippet.cursor.line,
     ch: snippet.cursor.ch,
   });
-  editor.focus();
+}
+
+/** Re-derive the hovered block from the LIVE document — items resolve their
+ *  target at run time, never from a snapshot taken when the menu opened. */
+export function resolveBlock(
+  editor: Editor, line: number,
+): { lines: string[]; block: Block } | null {
+  const lines = editor.getValue().split('\n');
+  const block = blockAtLine(lines, line);
+  return block ? { lines, block } : null;
 }

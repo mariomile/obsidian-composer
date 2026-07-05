@@ -53,6 +53,16 @@ function isPlain(t: string): boolean {
   );
 }
 
+/** Widest run of contiguous lines around `line` that all satisfy `pred`. */
+function contiguousSpan(
+  lines: string[], line: number, pred: (t: string) => boolean,
+): [number, number] {
+  let s = line, e = line;
+  while (s > 0 && pred(lines[s - 1]!)) s--;
+  while (e < lines.length - 1 && pred(lines[e + 1]!)) e++;
+  return [s, e];
+}
+
 function listItemBlock(lines: string[], line: number): Block {
   const indent = lines[line]!.match(LIST_RE)![1]!.length;
   let e = line;
@@ -81,16 +91,12 @@ export function blockAtLine(lines: string[], line: number): Block | null {
   if (HR_RE.test(text)) return { startLine: line, endLine: line, type: 'hr' };
 
   if (QUOTE_RE.test(text)) {
-    let s = line, e = line;
-    while (s > 0 && QUOTE_RE.test(lines[s - 1]!)) s--;
-    while (e < lines.length - 1 && QUOTE_RE.test(lines[e + 1]!)) e++;
+    const [s, e] = contiguousSpan(lines, line, (t) => QUOTE_RE.test(t));
     return { startLine: s, endLine: e, type: CALLOUT_RE.test(lines[s]!) ? 'callout' : 'quote' };
   }
 
   if (TABLE_RE.test(text)) {
-    let s = line, e = line;
-    while (s > 0 && TABLE_RE.test(lines[s - 1]!)) s--;
-    while (e < lines.length - 1 && TABLE_RE.test(lines[e + 1]!)) e++;
+    const [s, e] = contiguousSpan(lines, line, (t) => TABLE_RE.test(t));
     return { startLine: s, endLine: e, type: 'table' };
   }
 
@@ -109,9 +115,7 @@ export function blockAtLine(lines: string[], line: number): Block | null {
     }
   }
 
-  let s = line, e = line;
-  while (s > 0 && isPlain(lines[s - 1]!)) s--;
-  while (e < lines.length - 1 && isPlain(lines[e + 1]!)) e++;
+  const [s, e] = contiguousSpan(lines, line, isPlain);
   return { startLine: s, endLine: e, type: 'paragraph' };
 }
 

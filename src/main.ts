@@ -3,7 +3,8 @@ import type { EditorView } from '@codemirror/view';
 import { blockAtLine, type Block } from './block-model.ts';
 import { GutterHandle } from './gutter.ts';
 import { ComposerMenu } from './menu.ts';
-import { insertItems, actionItems } from './items.ts';
+import { insertItems, actionItems, type ItemDeps } from './items.ts';
+import type { ComposerItem } from './menu-core.ts';
 import { DEFAULT_SETTINGS, ComposerSettingTab, type ComposerSettings } from './settings.ts';
 
 const HANDLE_WIDTH = 46;
@@ -66,6 +67,7 @@ export default class ComposerPlugin extends Plugin {
     window.clearTimeout(this.showTimer);
     this.handle.hide();
     this.lastLine = null;
+    this.current = null; // current is only meaningful while the handle shows
   }
 
   private activeContext(): EditorContext | null {
@@ -152,38 +154,30 @@ export default class ComposerPlugin extends Plugin {
     this.handle.showAt(left, top - 1);
   }
 
-  private openInsertMenu(altKey: boolean): void {
+  private openMenu(
+    where: 'above' | 'below', build: (deps: ItemDeps) => ComposerItem[],
+  ): void {
     const cur = this.current;
     const rect = this.handle.anchorRect();
     if (!cur || !rect) return;
-    const base = this.settings.insertPosition;
-    const where = altKey ? (base === 'below' ? 'above' : 'below') : base;
-    const deps = {
+    const deps: ItemDeps = {
       app: this.app,
       editor: cur.ctx.editor,
       view: cur.ctx.view,
-      block: cur.block,
-      lines: cur.ctx.editor.getValue().split('\n'),
+      blockLine: cur.block.startLine,
       where,
       settings: this.settings,
     };
-    this.menu.open({ getBoundingClientRect: () => rect }, insertItems(deps), () => this.hideHandle());
+    this.menu.open({ getBoundingClientRect: () => rect }, build(deps), () => this.hideHandle());
+  }
+
+  private openInsertMenu(altKey: boolean): void {
+    const base = this.settings.insertPosition;
+    this.openMenu(altKey ? (base === 'below' ? 'above' : 'below') : base, insertItems);
   }
 
   private openActionsMenu(): void {
-    const cur = this.current;
-    const rect = this.handle.anchorRect();
-    if (!cur || !rect) return;
-    const deps = {
-      app: this.app,
-      editor: cur.ctx.editor,
-      view: cur.ctx.view,
-      block: cur.block,
-      lines: cur.ctx.editor.getValue().split('\n'),
-      where: 'below' as const,
-      settings: this.settings,
-    };
-    this.menu.open({ getBoundingClientRect: () => rect }, actionItems(deps), () => this.hideHandle());
+    this.openMenu('below', actionItems);
   }
 
   onunload(): void {

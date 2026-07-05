@@ -1,9 +1,6 @@
-import { Component, setIcon } from 'obsidian';
+import { Component, Notice, setIcon } from 'obsidian';
 import { computePosition, offset, flip, shift, type VirtualElement } from '@floating-ui/dom';
 import { filterItems, type ComposerItem } from './menu-core.ts';
-
-export type { ComposerItem } from './menu-core.ts';
-export { filterItems } from './menu-core.ts';
 
 export class ComposerMenu extends Component {
   private el: HTMLElement;
@@ -97,7 +94,10 @@ export class ComposerMenu extends Component {
 
   private pick(item: ComposerItem): void {
     this.close();
-    void item.run();
+    Promise.resolve(item.run()).catch((e: unknown) => {
+      console.error('[composer] item failed:', item.id, e);
+      new Notice(`${item.label} failed`);
+    });
   }
 
   private indexFromEvent(e: MouseEvent): number | null {
