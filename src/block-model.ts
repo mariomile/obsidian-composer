@@ -97,12 +97,16 @@ export function blockAtLine(lines: string[], line: number): Block | null {
   if (LIST_RE.test(text)) return listItemBlock(lines, line);
   if (EMBED_RE.test(text)) return { startLine: line, endLine: line, type: 'embed' };
 
-  // Continuation line of a list item above? Walk to the top of the non-blank run.
+  // Continuation of a list item above? Walk up the non-blank run to the
+  // nearest preceding list-marker line.
   let up = line;
-  while (up > 0 && lines[up - 1]!.trim() !== '') up--;
-  if (up !== line && LIST_RE.test(lines[up]!)) {
-    const b = listItemBlock(lines, up);
-    if (b.endLine >= line) return b;
+  while (up > 0 && lines[up - 1]!.trim() !== '') {
+    up--;
+    if (LIST_RE.test(lines[up]!)) {
+      const b = listItemBlock(lines, up);
+      if (b.endLine >= line) return b;
+      break; // nearest item doesn't reach us → not a continuation
+    }
   }
 
   let s = line, e = line;

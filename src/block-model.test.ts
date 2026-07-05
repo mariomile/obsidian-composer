@@ -52,4 +52,8 @@ describe('blockAtLine', () => {
     assert.equal(blockAtLine(doc('![[Note]]'), 0)?.type, 'embed');
     assert.equal(blockAtLine(doc('text\n\n---\n\ntext'), 2)?.type, 'hr');
   });
+  it('continuation binds to the nearest preceding item in multi-item lists', () => {
+    assert.deepEqual(blockAtLine(doc('- a\n- b\n  cont'), 2), { startLine: 1, endLine: 2, type: 'list-item' });
+    assert.deepEqual(blockAtLine(doc('- a\n- b\n  cont'), 1), { startLine: 1, endLine: 2, type: 'list-item' });
+  });
 });
