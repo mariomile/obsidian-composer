@@ -197,7 +197,7 @@ export function ensureBlockId(
   const m = last.match(BLOCK_ID_RE);
   if (m) return { edit: null, id: m[1]! };
   const id = genId();
-  if (block.type === 'table' || block.type === 'code-fence') {
+  if (block.type === 'table' || block.type === 'code-fence' || block.type === 'hr' || block.type === 'embed') {
     if (lines[block.endLine + 1]?.trim() === '') {
       const standalone = lines[block.endLine + 2]?.match(/^\^([A-Za-z0-9-]+)\s*$/);
       if (standalone) return { edit: null, id: standalone[1]! };

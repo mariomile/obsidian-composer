@@ -8,7 +8,7 @@ A Notion-style block handle for Obsidian: hover any block in Live Preview to rev
 
 Hover over a block (paragraph, heading, list item, callout, table, code fence, quote…) and a small handle appears in the left gutter. It has two buttons:
 
-- **＋ Insert** — opens a searchable menu to insert a new block below (or above, with ⌥-click) the hovered block.
+- **＋ Insert** — opens a searchable menu to insert a new block below (⌥-click flips the default direction) the hovered block.
 - **⠿ Actions** — opens a menu of transforms and operations on the hovered block itself: turn into another block type, move up/down, duplicate, copy a block link, or delete.
 
 Both menus support fuzzy filtering, arrow-key navigation, `Enter` to confirm, `Esc` to close, and close on outside click. All insertions are a single undo step.

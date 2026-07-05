@@ -148,6 +148,11 @@ describe('ensureBlockId', () => {
     assert.equal(r.id, 'tbl1');
     assert.equal(r.edit, null);
   });
+  it('puts id on its own line after hr and embed blocks', () => {
+    const l = doc('---');
+    const r = ensureBlockId(l, { startLine: 0, endLine: 0, type: 'hr' }, () => 'sep1');
+    assert.deepEqual(r.edit, { fromLine: 1, toLine: 0, insert: ['', '^sep1'] });
+  });
 });
 
 describe('insertionEdit', () => {

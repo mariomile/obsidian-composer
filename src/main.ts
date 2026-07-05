@@ -45,8 +45,9 @@ export default class ComposerPlugin extends Plugin {
     this.registerDomEvent(document, 'wheel', () => this.dismiss(), { capture: true, passive: true });
     this.registerDomEvent(document, 'keydown', (e) => {
       if (this.menu.isVisible()) return; // menu handles its own keys
-      if (e.key === 'Escape') this.dismiss();
-      else this.hideHandle(); // typing hides the handle
+      if (e.key === 'Escape') { this.dismiss(); return; }
+      if (e.key === 'Alt' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta') return;
+      this.hideHandle(); // typing hides the handle
     });
     this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.dismiss()));
   }
@@ -178,5 +179,9 @@ export default class ComposerPlugin extends Plugin {
       settings: this.settings,
     };
     this.menu.open({ getBoundingClientRect: () => rect }, actionItems(deps), () => this.hideHandle());
+  }
+
+  onunload(): void {
+    window.clearTimeout(this.showTimer);
   }
 }
