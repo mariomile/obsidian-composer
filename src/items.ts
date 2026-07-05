@@ -1,11 +1,11 @@
 import type { App, Editor, MarkdownView, TFile } from 'obsidian';
-import { Notice } from 'obsidian';
+import { Notice, normalizePath } from 'obsidian';
 import { insertionEdit, type Block } from './block-model.ts';
 import type { ComposerItem } from './menu-core.ts';
 import { BASIC_SNIPPETS } from './snippets.ts';
 import { insertSnippet, applyLineEdit } from './actions.ts';
 import {
-  FilePicker, mdNotes, imageFiles, canvasFiles, filesInFolder, embedTextFor,
+  FilePicker, mdNotes, imageFiles, canvasFiles, filesInFolder, embedTextFor, baseFiles,
 } from './pickers.ts';
 
 export interface ItemDeps {
@@ -19,6 +19,20 @@ export interface ItemDeps {
 
 // Templates folder is hard-coded until settings land in Task 11.
 const TEMPLATE_FOLDER = 'Resources/Templates';
+
+const BASE_TEMPLATE = `views:
+  - type: table
+    name: Table
+`;
+
+async function createBaseFile(app: App, folderPath: string, baseName: string): Promise<TFile> {
+  let name = baseName;
+  let i = 1;
+  while (app.vault.getAbstractFileByPath(normalizePath(`${folderPath}/${name}.base`))) {
+    name = `${baseName} ${++i}`;
+  }
+  return app.vault.create(normalizePath(`${folderPath}/${name}.base`), BASE_TEMPLATE);
+}
 
 function insertEmbed(deps: ItemDeps, text: string): void {
   const { edit, firstInsertedLine } = insertionEdit(deps.block, [text], deps.where);
@@ -43,7 +57,29 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
       run: () => insertSnippet(deps.editor, deps.block, s.make(), deps.where),
     });
   }
-  // Base / AI sections appended in Tasks 9, 11.
+  // AI section appended in Task 11.
+  items.push(
+    {
+      id: 'base-new', label: 'New Base', icon: 'database', section: 'Base',
+      keywords: ['base', 'database', 'table', 'view'],
+      run: async () => {
+        const folder = deps.view.file?.parent?.path ?? '/';
+        const noteName = deps.view.file?.basename ?? 'Untitled';
+        const f = await createBaseFile(deps.app, folder, `${noteName} Base`);
+        insertEmbed(deps, `![[${f.name}]]`);
+        new Notice(`Created ${f.path}`);
+      },
+    },
+    {
+      id: 'base-link', label: 'Link existing Base', icon: 'database-zap', section: 'Base',
+      keywords: ['base', 'database', 'existing'],
+      run: () => {
+        const files = baseFiles(deps.app);
+        if (!files.length) { new Notice('No .base files in vault'); return; }
+        new FilePicker(deps.app, files, 'Embed base…', (f) => insertEmbed(deps, embedTextFor(f))).open();
+      },
+    },
+  );
   items.push(
     {
       id: 'embed-note', label: 'Note', icon: 'file-text', section: 'Embed',
