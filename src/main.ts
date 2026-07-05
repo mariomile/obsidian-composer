@@ -18,7 +18,7 @@ export default class ComposerPlugin extends Plugin {
   settings!: ComposerSettings;
   private handle!: GutterHandle;
   private menu!: ComposerMenu;
-  private current: { ctx: EditorContext; block: Block } | null = null;
+  private current: { ctx: EditorContext; block: Block; anchorTop: number | null } | null = null;
   private lastLine: number | null = null;
   private showTimer = 0;
 
@@ -70,6 +70,24 @@ export default class ComposerPlugin extends Plugin {
     return { view, editor: view.editor, cm };
   }
 
+  /** Line under the pointer. Embed-block widgets (callouts, tables) swallow
+   *  posAtCoords, so hit-test the DOM first and map the widget back to a doc
+   *  position with posAtDOM. Returns the 0-based line plus an optional anchor
+   *  top (widget rect) for positioning when coordsAtPos can't resolve. */
+  private lineAtEvent(cm: EditorView, e: MouseEvent): { line: number; anchorTop: number | null } {
+    const target = e.target as HTMLElement;
+    const widget = target.closest<HTMLElement>('.cm-embed-block');
+    if (widget && cm.contentDOM.contains(widget)) {
+      const pos = cm.posAtDOM(widget);
+      return {
+        line: cm.state.doc.lineAt(pos).number - 1,
+        anchorTop: widget.getBoundingClientRect().top,
+      };
+    }
+    const pos = cm.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+    return { line: cm.state.doc.lineAt(pos).number - 1, anchorTop: null };
+  }
+
   private onMouseMove(e: MouseEvent): void {
     if (this.menu.isVisible()) return;
     if (this.handle.containsTarget(e.target as Node)) return;
@@ -84,8 +102,7 @@ export default class ComposerPlugin extends Plugin {
       return;
     }
 
-    const pos = ctx.cm.posAtCoords({ x: e.clientX, y: e.clientY }, false);
-    const line = ctx.cm.state.doc.lineAt(pos).number - 1; // 0-based
+    const { line, anchorTop } = this.lineAtEvent(ctx.cm, e);
     // Same line → handle already visible or the show-timer is pending; either
     // way there is nothing to recompute or reschedule.
     if (line === this.lastLine) return;
@@ -97,17 +114,20 @@ export default class ComposerPlugin extends Plugin {
       return;
     }
     this.lastLine = line;
-    this.current = { ctx, block };
+    this.current = { ctx, block, anchorTop };
 
     if (this.handle.isVisible()) {
-      this.positionHandle(ctx.cm, block);
+      this.positionHandle(ctx.cm, block, anchorTop);
     } else {
       window.clearTimeout(this.showTimer);
-      this.showTimer = window.setTimeout(() => this.positionHandle(ctx.cm, block), this.settings.hoverDelayMs);
+      this.showTimer = window.setTimeout(
+        () => this.positionHandle(ctx.cm, block, anchorTop),
+        this.settings.hoverDelayMs,
+      );
     }
   }
 
-  private positionHandle(cm: EditorView, block: Block): void {
+  private positionHandle(cm: EditorView, block: Block, anchorTop: number | null): void {
     // The block was derived when the timer was scheduled; the doc may have
     // changed since. Re-validate before touching cm.state.doc.line().
     if (block.startLine + 1 > cm.state.doc.lines) {
@@ -116,13 +136,14 @@ export default class ComposerPlugin extends Plugin {
     }
     const from = cm.state.doc.line(block.startLine + 1).from;
     const coords = cm.coordsAtPos(from);
-    if (!coords) {
+    const top = coords?.top ?? anchorTop;
+    if (top == null) {
       this.hideHandle();
       return;
     }
     const contentRect = cm.contentDOM.getBoundingClientRect();
     const left = Math.max(8, contentRect.left - HANDLE_WIDTH - 6);
-    this.handle.showAt(left, coords.top - 1);
+    this.handle.showAt(left, top - 1);
   }
 
   private openInsertMenu(altKey: boolean): void {
