@@ -1,6 +1,10 @@
 import type { App, Editor, MarkdownView, TFile } from 'obsidian';
 import { Notice, normalizePath } from 'obsidian';
-import { insertionEdit, type Block } from './block-model.ts';
+import {
+  insertionEdit, type Block,
+  turnInto, duplicateBlock, deleteBlock, moveBlock, ensureBlockId,
+  type TurnTarget,
+} from './block-model.ts';
 import type { ComposerItem } from './menu-core.ts';
 import { BASIC_SNIPPETS } from './snippets.ts';
 import { insertSnippet, applyLineEdit } from './actions.ts';
@@ -125,5 +129,90 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
       },
     },
   );
+  return items;
+}
+
+const TURN_TARGETS: Array<{ target: TurnTarget; label: string; icon: string }> = [
+  { target: 'paragraph', label: 'Paragraph', icon: 'pilcrow' },
+  { target: 'h1', label: 'Heading 1', icon: 'heading-1' },
+  { target: 'h2', label: 'Heading 2', icon: 'heading-2' },
+  { target: 'h3', label: 'Heading 3', icon: 'heading-3' },
+  { target: 'bullet', label: 'Bullet list', icon: 'list' },
+  { target: 'todo', label: 'To-do list', icon: 'square-check' },
+  { target: 'quote', label: 'Quote', icon: 'quote' },
+  { target: 'callout', label: 'Callout', icon: 'megaphone' },
+];
+
+function randomBlockId(): string {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+export function actionItems(deps: ItemDeps): ComposerItem[] {
+  const items: ComposerItem[] = [];
+
+  for (const t of TURN_TARGETS) {
+    items.push({
+      id: `turn-${t.target}`, label: t.label, icon: t.icon, section: 'Turn into',
+      keywords: ['turn', 'convert', t.target],
+      run: () => {
+        applyLineEdit(deps.editor, turnInto(deps.lines, deps.block, t.target));
+        deps.editor.setCursor({ line: deps.block.startLine, ch: 0 });
+        deps.editor.focus();
+      },
+    });
+  }
+
+  items.push(
+    {
+      id: 'move-up', label: 'Move up', icon: 'arrow-up', section: 'Actions',
+      keywords: ['move', 'reorder', 'up'],
+      run: () => {
+        const r = moveBlock(deps.lines, deps.block, 'up');
+        if (!r) return;
+        applyLineEdit(deps.editor, r.edit);
+        deps.editor.setCursor({ line: r.cursorLine, ch: 0 });
+        deps.editor.focus();
+      },
+    },
+    {
+      id: 'move-down', label: 'Move down', icon: 'arrow-down', section: 'Actions',
+      keywords: ['move', 'reorder', 'down'],
+      run: () => {
+        const r = moveBlock(deps.lines, deps.block, 'down');
+        if (!r) return;
+        applyLineEdit(deps.editor, r.edit);
+        deps.editor.setCursor({ line: r.cursorLine, ch: 0 });
+        deps.editor.focus();
+      },
+    },
+    {
+      id: 'duplicate', label: 'Duplicate', icon: 'copy', section: 'Actions',
+      keywords: ['duplicate', 'copy'],
+      run: () => {
+        applyLineEdit(deps.editor, duplicateBlock(deps.lines, deps.block));
+        deps.editor.focus();
+      },
+    },
+    {
+      id: 'copy-link', label: 'Copy block link', icon: 'link', section: 'Actions',
+      keywords: ['link', 'block', 'reference'],
+      run: async () => {
+        const { edit, id } = ensureBlockId(deps.lines, deps.block, randomBlockId);
+        if (edit) applyLineEdit(deps.editor, edit);
+        const basename = deps.view.file?.basename ?? '';
+        await navigator.clipboard.writeText(`[[${basename}#^${id}]]`);
+        new Notice('Block link copied');
+      },
+    },
+    {
+      id: 'delete', label: 'Delete', icon: 'trash-2', section: 'Actions',
+      keywords: ['delete', 'remove'],
+      run: () => {
+        applyLineEdit(deps.editor, deleteBlock(deps.lines, deps.block));
+        deps.editor.focus();
+      },
+    },
+  );
+
   return items;
 }
