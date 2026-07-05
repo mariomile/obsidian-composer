@@ -4,9 +4,9 @@ import { blockAtLine, type Block } from './block-model.ts';
 import { GutterHandle } from './gutter.ts';
 import { ComposerMenu } from './menu.ts';
 import { insertItems, actionItems } from './items.ts';
+import { DEFAULT_SETTINGS, ComposerSettingTab, type ComposerSettings } from './settings.ts';
 
 const HANDLE_WIDTH = 46;
-const HOVER_DELAY_MS = 150; // becomes a setting in Task 11
 
 interface EditorContext {
   view: MarkdownView;
@@ -15,13 +15,23 @@ interface EditorContext {
 }
 
 export default class ComposerPlugin extends Plugin {
+  settings!: ComposerSettings;
   private handle!: GutterHandle;
   private menu!: ComposerMenu;
   private current: { ctx: EditorContext; block: Block } | null = null;
   private lastLine: number | null = null;
   private showTimer = 0;
 
+  async loadSettings(): Promise<void> {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
+  }
+
   async onload(): Promise<void> {
+    await this.loadSettings();
     this.handle = new GutterHandle({
       onPlus: (altKey) => this.openInsertMenu(altKey),
       onGrip: () => this.openActionsMenu(),
@@ -29,6 +39,7 @@ export default class ComposerPlugin extends Plugin {
     this.addChild(this.handle);
     this.menu = new ComposerMenu();
     this.addChild(this.menu);
+    this.addSettingTab(new ComposerSettingTab(this.app, this));
 
     this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
     this.registerDomEvent(document, 'wheel', () => this.dismiss(), { capture: true, passive: true });
@@ -92,7 +103,7 @@ export default class ComposerPlugin extends Plugin {
       this.positionHandle(ctx.cm, block);
     } else {
       window.clearTimeout(this.showTimer);
-      this.showTimer = window.setTimeout(() => this.positionHandle(ctx.cm, block), HOVER_DELAY_MS);
+      this.showTimer = window.setTimeout(() => this.positionHandle(ctx.cm, block), this.settings.hoverDelayMs);
     }
   }
 
@@ -118,13 +129,16 @@ export default class ComposerPlugin extends Plugin {
     const cur = this.current;
     const rect = this.handle.anchorRect();
     if (!cur || !rect) return;
+    const base = this.settings.insertPosition;
+    const where = altKey ? (base === 'below' ? 'above' : 'below') : base;
     const deps = {
       app: this.app,
       editor: cur.ctx.editor,
       view: cur.ctx.view,
       block: cur.block,
       lines: cur.ctx.editor.getValue().split('\n'),
-      where: (altKey ? 'above' : 'below') as 'above' | 'below',
+      where,
+      settings: this.settings,
     };
     this.menu.open({ getBoundingClientRect: () => rect }, insertItems(deps), () => this.hideHandle());
   }
@@ -140,6 +154,7 @@ export default class ComposerPlugin extends Plugin {
       block: cur.block,
       lines: cur.ctx.editor.getValue().split('\n'),
       where: 'below' as const,
+      settings: this.settings,
     };
     this.menu.open({ getBoundingClientRect: () => rect }, actionItems(deps), () => this.hideHandle());
   }

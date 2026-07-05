@@ -11,6 +11,7 @@ import { insertSnippet, applyLineEdit } from './actions.ts';
 import {
   FilePicker, mdNotes, imageFiles, canvasFiles, filesInFolder, embedTextFor, baseFiles,
 } from './pickers.ts';
+import type { ComposerSettings } from './settings.ts';
 
 export interface ItemDeps {
   app: App;
@@ -19,10 +20,13 @@ export interface ItemDeps {
   block: Block;
   lines: string[];
   where: 'above' | 'below';
+  settings: ComposerSettings;
 }
 
-// Templates folder is hard-coded until settings land in Task 11.
-const TEMPLATE_FOLDER = 'Resources/Templates';
+interface CommandRegistry {
+  findCommand(id: string): unknown;
+  executeCommandById(id: string): boolean;
+}
 
 const BASE_TEMPLATE = `views:
   - type: table
@@ -61,13 +65,12 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
       run: () => insertSnippet(deps.editor, deps.block, s.make(), deps.where),
     });
   }
-  // AI section appended in Task 11.
   items.push(
     {
       id: 'base-new', label: 'New Base', icon: 'database', section: 'Base',
       keywords: ['base', 'database', 'table', 'view'],
       run: async () => {
-        const folder = deps.view.file?.parent?.path ?? '/';
+        const folder = deps.settings.baseFolder || (deps.view.file?.parent?.path ?? '/');
         const noteName = deps.view.file?.basename ?? 'Untitled';
         try {
           const f = await createBaseFile(deps.app, folder, `${noteName} Base`);
@@ -107,14 +110,14 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
     {
       id: 'embed-artifact', label: 'HTML artifact', icon: 'app-window', section: 'Embed',
       keywords: ['html', 'artifact'],
-      run: () => pickAndEmbed(deps, filesInFolder(deps.app, 'Resources/_artifacts', 'html'), 'Embed artifact…'),
+      run: () => pickAndEmbed(deps, filesInFolder(deps.app, deps.settings.artifactFolder, 'html'), 'Embed artifact…'),
     },
     {
       id: 'template', label: 'Template', icon: 'file-plus', section: 'Template',
       keywords: ['template', 'boilerplate'],
       run: () => {
-        const files = filesInFolder(deps.app, TEMPLATE_FOLDER, 'md');
-        if (!files.length) { new Notice(`No templates in ${TEMPLATE_FOLDER}`); return; }
+        const files = filesInFolder(deps.app, deps.settings.templateFolder, 'md');
+        if (!files.length) { new Notice(`No templates in ${deps.settings.templateFolder}`); return; }
         new FilePicker(deps.app, files, 'Insert template…', (f) => {
           void deps.app.vault.read(f).then((content) => {
             const lines = content.replace(/\n$/, '').split('\n');
@@ -129,6 +132,23 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
       },
     },
   );
+
+  const commands = (deps.app as unknown as { commands: CommandRegistry }).commands;
+  if (deps.settings.aiEnabled && commands.findCommand(deps.settings.exoCommandId)) {
+    items.push({
+      id: 'ask-exo', label: 'Ask Exo', icon: 'sparkles', section: 'AI',
+      keywords: ['ai', 'exo', 'assistant'],
+      run: () => {
+        // Land the cursor on a fresh line at the insert position, then hand off to Exo.
+        const { edit, firstInsertedLine } = insertionEdit(deps.block, [''], deps.where);
+        applyLineEdit(deps.editor, edit);
+        deps.editor.setCursor({ line: firstInsertedLine, ch: 0 });
+        deps.editor.focus();
+        commands.executeCommandById(deps.settings.exoCommandId);
+      },
+    });
+  }
+
   return items;
 }
 
