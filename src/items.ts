@@ -65,9 +65,13 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
       run: async () => {
         const folder = deps.view.file?.parent?.path ?? '/';
         const noteName = deps.view.file?.basename ?? 'Untitled';
-        const f = await createBaseFile(deps.app, folder, `${noteName} Base`);
-        insertEmbed(deps, `![[${f.name}]]`);
-        new Notice(`Created ${f.path}`);
+        try {
+          const f = await createBaseFile(deps.app, folder, `${noteName} Base`);
+          insertEmbed(deps, `![[${f.name}]]`);
+          new Notice(`Created ${f.path}`);
+        } catch {
+          new Notice('Could not create base file');
+        }
       },
     },
     {
