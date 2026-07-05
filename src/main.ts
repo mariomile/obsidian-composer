@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import { blockAtLine, type Block } from './block-model.ts';
 import { GutterHandle } from './gutter.ts';
 import { ComposerMenu } from './menu.ts';
+import { insertItems } from './items.ts';
 
 const HANDLE_WIDTH = 46;
 const HOVER_DELAY_MS = 150; // becomes a setting in Task 11
@@ -113,8 +114,20 @@ export default class ComposerPlugin extends Plugin {
     this.handle.showAt(left, coords.top - 1);
   }
 
-  // Filled in Task 7.
-  private openInsertMenu(_altKey: boolean): void {}
+  private openInsertMenu(altKey: boolean): void {
+    const cur = this.current;
+    const rect = this.handle.anchorRect();
+    if (!cur || !rect) return;
+    const deps = {
+      app: this.app,
+      editor: cur.ctx.editor,
+      view: cur.ctx.view,
+      block: cur.block,
+      lines: cur.ctx.editor.getValue().split('\n'),
+      where: (altKey ? 'above' : 'below') as 'above' | 'below',
+    };
+    this.menu.open({ getBoundingClientRect: () => rect }, insertItems(deps), () => this.hideHandle());
+  }
 
   // Filled in Task 10.
   private openActionsMenu(): void {}
