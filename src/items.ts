@@ -78,6 +78,8 @@ export function insertItems(deps: ItemDeps): ComposerItem[] {
             applyLineEdit(deps.editor, edit);
             deps.editor.setCursor({ line: firstInsertedLine, ch: 0 });
             deps.editor.focus();
+          }).catch(() => {
+            new Notice(`Could not read template: ${f.path}`);
           });
         }).open();
       },

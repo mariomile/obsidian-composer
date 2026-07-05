@@ -1,4 +1,5 @@
 import { FuzzySuggestModal, type App, type TFile } from 'obsidian';
+import { IMAGE_EXTS, inFolder, isCanvasLike } from './pickers-core.ts';
 
 export class FilePicker extends FuzzySuggestModal<TFile> {
   constructor(
@@ -24,8 +25,6 @@ export class FilePicker extends FuzzySuggestModal<TFile> {
   }
 }
 
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
-
 export function mdNotes(app: App): TFile[] {
   return app.vault.getMarkdownFiles();
 }
@@ -35,9 +34,7 @@ export function imageFiles(app: App): TFile[] {
 }
 
 export function canvasFiles(app: App): TFile[] {
-  return app.vault.getFiles().filter(
-    (f) => f.extension === 'canvas' || f.name.endsWith('.excalidraw.md'),
-  );
+  return app.vault.getFiles().filter((f) => isCanvasLike(f));
 }
 
 export function baseFiles(app: App): TFile[] {
@@ -45,14 +42,9 @@ export function baseFiles(app: App): TFile[] {
 }
 
 export function filesInFolder(app: App, folder: string, ext?: string): TFile[] {
-  const prefix = folder.endsWith('/') ? folder : `${folder}/`;
   return app.vault.getFiles().filter(
-    (f) => f.path.startsWith(prefix) && (!ext || f.extension === ext),
+    (f) => inFolder(f.path, folder) && (!ext || f.extension === ext),
   );
 }
 
-export function embedTextFor(f: TFile): string {
-  return f.extension === 'md' && !f.name.endsWith('.excalidraw.md')
-    ? `![[${f.basename}]]`
-    : `![[${f.name}]]`;
-}
+export { embedTextFor } from './pickers-core.ts';
