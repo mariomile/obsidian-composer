@@ -27,10 +27,24 @@ export class ComposerMenu extends Component {
 
     this.registerDomEvent(this.searchEl, 'input', () => this.render(this.searchEl.value));
     this.registerDomEvent(this.searchEl, 'keydown', (e: KeyboardEvent) => this.onKey(e));
-    // Keep editor focus semantics: don't let clicks inside blur the input.
-    this.registerDomEvent(this.el, 'mousedown', (e) => e.preventDefault());
+    // Don't let clicks inside the menu blur the search input — but allow
+    // clicks IN the input itself to reposition the caret.
+    this.registerDomEvent(this.el, 'mousedown', (e) => {
+      if (this.searchEl.contains(e.target as Node)) return;
+      e.preventDefault();
+    });
     this.registerDomEvent(document, 'mousedown', (e) => {
       if (this.visible && !this.el.contains(e.target as Node)) this.close();
+    });
+    this.registerDomEvent(this.listEl, 'click', (e) => {
+      const i = this.indexFromEvent(e);
+      if (i === null) return;
+      const entry = this.rendered[i];
+      if (entry) this.pick(entry.item);
+    });
+    this.registerDomEvent(this.listEl, 'mousemove', (e) => {
+      const i = this.indexFromEvent(e);
+      if (i !== null && i !== this.activeIndex) this.setActive(i);
     });
   }
 
@@ -46,6 +60,7 @@ export class ComposerMenu extends Component {
       placement: 'right-start',
       middleware: [offset(6), flip({ fallbackPlacements: ['left-start', 'bottom-start'] }), shift({ padding: 8 })],
     }).then(({ x, y }) => {
+      if (!this.visible) return;
       this.el.style.left = `${x}px`;
       this.el.style.top = `${y}px`;
       this.searchEl.focus();
@@ -81,6 +96,13 @@ export class ComposerMenu extends Component {
     void item.run();
   }
 
+  private indexFromEvent(e: MouseEvent): number | null {
+    const itemEl = (e.target as HTMLElement).closest<HTMLElement>('.composer-menu-item');
+    if (!itemEl || !this.listEl.contains(itemEl)) return null;
+    const i = Number(itemEl.dataset.composerIndex);
+    return Number.isInteger(i) ? i : null;
+  }
+
   private setActive(i: number): void {
     if (!this.rendered.length) return;
     const n = this.rendered.length;
@@ -103,9 +125,7 @@ export class ComposerMenu extends Component {
       const iconEl = el.createSpan({ cls: 'composer-menu-item-icon' });
       setIcon(iconEl, item.icon);
       el.createSpan({ text: item.label });
-      const index = this.rendered.length;
-      this.registerDomEvent(el, 'mousemove', () => this.setActive(index));
-      this.registerDomEvent(el, 'click', () => this.pick(item));
+      el.dataset.composerIndex = String(this.rendered.length);
       this.rendered.push({ item, el });
     }
     this.activeIndex = 0;
