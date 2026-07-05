@@ -114,3 +114,108 @@ export function blockAtLine(lines: string[], line: number): Block | null {
   while (e < lines.length - 1 && isPlain(lines[e + 1]!)) e++;
   return { startLine: s, endLine: e, type: 'paragraph' };
 }
+
+export interface LineEdit {
+  fromLine: number;
+  toLine: number; // toLine === fromLine - 1 → pure insertion before fromLine
+  insert: string[];
+}
+
+export type TurnTarget =
+  | 'paragraph' | 'h1' | 'h2' | 'h3' | 'quote' | 'callout' | 'bullet' | 'todo';
+
+export function stripLine(t: string): string {
+  let s = t.replace(/^\s+/, '');
+  s = s.replace(/^(?:>\s*)+/, '');
+  s = s.replace(/^\[![^\]]*\][+-]?\s*/, '');
+  s = s.replace(/^#{1,6}\s+/, '');
+  s = s.replace(/^(?:[-*+]|\d+[.)])\s+/, '');
+  s = s.replace(/^\[[ xX]\]\s+/, '');
+  return s;
+}
+
+export function turnInto(lines: string[], block: Block, target: TurnTarget): LineEdit {
+  const src = lines.slice(block.startLine, block.endLine + 1).map(stripLine);
+  let out: string[];
+  switch (target) {
+    case 'paragraph': out = src; break;
+    case 'h1': out = src.map((t) => `# ${t}`); break;
+    case 'h2': out = src.map((t) => `## ${t}`); break;
+    case 'h3': out = src.map((t) => `### ${t}`); break;
+    case 'bullet': out = src.map((t) => `- ${t}`); break;
+    case 'todo': out = src.map((t) => `- [ ] ${t}`); break;
+    case 'quote': out = src.map((t) => `> ${t}`); break;
+    case 'callout':
+      out = [`> [!note] ${src[0] ?? ''}`, ...src.slice(1).map((t) => `> ${t}`)];
+      break;
+  }
+  return { fromLine: block.startLine, toLine: block.endLine, insert: out.map((l) => l.trimEnd()) };
+}
+
+export function duplicateBlock(lines: string[], block: Block): LineEdit {
+  const copy = lines.slice(block.startLine, block.endLine + 1);
+  const gap = block.type === 'list-item' ? [] : [''];
+  return { fromLine: block.endLine + 1, toLine: block.endLine, insert: [...gap, ...copy] };
+}
+
+export function deleteBlock(lines: string[], block: Block): LineEdit {
+  let end = block.endLine;
+  if (end + 1 < lines.length && lines[end + 1]!.trim() === '') end++;
+  return { fromLine: block.startLine, toLine: end, insert: [] };
+}
+
+function adjacentBlock(lines: string[], block: Block, dir: 'up' | 'down'): Block | null {
+  let probe = dir === 'up' ? block.startLine - 1 : block.endLine + 1;
+  while (probe >= 0 && probe < lines.length && lines[probe]!.trim() === '') {
+    probe += dir === 'up' ? -1 : 1;
+  }
+  if (probe < 0 || probe >= lines.length) return null;
+  return blockAtLine(lines, probe);
+}
+
+export function moveBlock(
+  lines: string[], block: Block, dir: 'up' | 'down',
+): { edit: LineEdit; cursorLine: number } | null {
+  const other = adjacentBlock(lines, block, dir);
+  if (!other) return null;
+  const [first, second] = dir === 'up' ? [other, block] : [block, other];
+  const a = lines.slice(first.startLine, first.endLine + 1);
+  const b = lines.slice(second.startLine, second.endLine + 1);
+  const gap = lines.slice(first.endLine + 1, second.startLine);
+  return {
+    edit: { fromLine: first.startLine, toLine: second.endLine, insert: [...b, ...gap, ...a] },
+    cursorLine: dir === 'up' ? first.startLine : first.startLine + b.length + gap.length,
+  };
+}
+
+const BLOCK_ID_RE = /\s\^([A-Za-z0-9-]+)\s*$/;
+
+export function ensureBlockId(
+  lines: string[], block: Block, genId: () => string,
+): { edit: LineEdit | null; id: string } {
+  const last = lines[block.endLine]!;
+  const m = last.match(BLOCK_ID_RE);
+  if (m) return { edit: null, id: m[1]! };
+  const id = genId();
+  if (block.type === 'table' || block.type === 'code-fence') {
+    return { edit: { fromLine: block.endLine + 1, toLine: block.endLine, insert: ['', `^${id}`] }, id };
+  }
+  return { edit: { fromLine: block.endLine, toLine: block.endLine, insert: [`${last} ^${id}`] }, id };
+}
+
+export function insertionEdit(
+  block: Block, snippet: string[], where: 'above' | 'below',
+): { edit: LineEdit; firstInsertedLine: number } {
+  if (where === 'below') {
+    const at = block.endLine + 1;
+    return {
+      edit: { fromLine: at, toLine: at - 1, insert: ['', ...snippet] },
+      firstInsertedLine: at + 1,
+    };
+  }
+  const at = block.startLine;
+  return {
+    edit: { fromLine: at, toLine: at - 1, insert: [...snippet, ''] },
+    firstInsertedLine: at,
+  };
+}

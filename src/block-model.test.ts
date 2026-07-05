@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { blockAtLine, fenceRanges, frontmatterRange } from './block-model.ts';
+import {
+  turnInto, duplicateBlock, deleteBlock, moveBlock,
+  ensureBlockId, insertionEdit, stripLine,
+} from './block-model.ts';
 
 const doc = (s: string) => s.split('\n');
 
@@ -55,5 +59,99 @@ describe('blockAtLine', () => {
   it('continuation binds to the nearest preceding item in multi-item lists', () => {
     assert.deepEqual(blockAtLine(doc('- a\n- b\n  cont'), 2), { startLine: 1, endLine: 2, type: 'list-item' });
     assert.deepEqual(blockAtLine(doc('- a\n- b\n  cont'), 1), { startLine: 1, endLine: 2, type: 'list-item' });
+  });
+});
+
+describe('stripLine', () => {
+  it('strips heading, quote, list, todo markers', () => {
+    assert.equal(stripLine('## Title'), 'Title');
+    assert.equal(stripLine('> > nested'), 'nested');
+    assert.equal(stripLine('- [ ] task'), 'task');
+    assert.equal(stripLine('3. item'), 'item');
+    assert.equal(stripLine('> [!note]- Folded'), 'Folded');
+  });
+});
+
+describe('turnInto', () => {
+  const lines = doc('before\n\nalpha\nbeta\n\nafter');
+  const block = { startLine: 2, endLine: 3, type: 'paragraph' as const };
+  it('h2 per line', () => {
+    assert.deepEqual(turnInto(lines, block, 'h2'),
+      { fromLine: 2, toLine: 3, insert: ['## alpha', '## beta'] });
+  });
+  it('callout wraps with header on first line', () => {
+    assert.deepEqual(turnInto(lines, block, 'callout').insert,
+      ['> [!note] alpha', '> beta']);
+  });
+  it('paragraph strips existing markers', () => {
+    const l = doc('- one\n- two');
+    const b = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    assert.deepEqual(turnInto(l, b, 'paragraph').insert, ['one']);
+  });
+});
+
+describe('duplicateBlock / deleteBlock', () => {
+  it('duplicate paragraph adds blank separator', () => {
+    const l = doc('aaa\n\nbbb');
+    assert.deepEqual(duplicateBlock(l, { startLine: 0, endLine: 0, type: 'paragraph' }),
+      { fromLine: 1, toLine: 0, insert: ['', 'aaa'] });
+  });
+  it('duplicate list item has no separator', () => {
+    const l = doc('- a\n- b');
+    assert.deepEqual(duplicateBlock(l, { startLine: 0, endLine: 0, type: 'list-item' }),
+      { fromLine: 1, toLine: 0, insert: ['- a'] });
+  });
+  it('delete swallows one trailing blank line', () => {
+    const l = doc('aaa\n\nbbb');
+    assert.deepEqual(deleteBlock(l, { startLine: 0, endLine: 0, type: 'paragraph' }),
+      { fromLine: 0, toLine: 1, insert: [] });
+  });
+});
+
+describe('moveBlock', () => {
+  const l = doc('one\n\ntwo\n\nthree');
+  it('moves down past the gap', () => {
+    const r = moveBlock(l, { startLine: 0, endLine: 0, type: 'paragraph' }, 'down')!;
+    assert.deepEqual(r.edit, { fromLine: 0, toLine: 2, insert: ['two', '', 'one'] });
+    assert.equal(r.cursorLine, 2);
+  });
+  it('moves up', () => {
+    const r = moveBlock(l, { startLine: 2, endLine: 2, type: 'paragraph' }, 'up')!;
+    assert.deepEqual(r.edit, { fromLine: 0, toLine: 2, insert: ['two', '', 'one'] });
+    assert.equal(r.cursorLine, 0);
+  });
+  it('null at document edge', () => {
+    assert.equal(moveBlock(l, { startLine: 0, endLine: 0, type: 'paragraph' }, 'up'), null);
+  });
+});
+
+describe('ensureBlockId', () => {
+  it('reuses an existing id without an edit', () => {
+    const l = doc('some text ^abc123');
+    const r = ensureBlockId(l, { startLine: 0, endLine: 0, type: 'paragraph' }, () => 'zzz');
+    assert.equal(r.id, 'abc123');
+    assert.equal(r.edit, null);
+  });
+  it('appends id inline for paragraphs', () => {
+    const l = doc('some text');
+    const r = ensureBlockId(l, { startLine: 0, endLine: 0, type: 'paragraph' }, () => 'newid1');
+    assert.deepEqual(r.edit, { fromLine: 0, toLine: 0, insert: ['some text ^newid1'] });
+  });
+  it('puts id on its own line after tables', () => {
+    const l = doc('| a |\n| - |');
+    const r = ensureBlockId(l, { startLine: 0, endLine: 1, type: 'table' }, () => 'tbl1');
+    assert.deepEqual(r.edit, { fromLine: 2, toLine: 1, insert: ['', '^tbl1'] });
+  });
+});
+
+describe('insertionEdit', () => {
+  const block = { startLine: 2, endLine: 3, type: 'paragraph' as const };
+  it('below adds separating blank line', () => {
+    assert.deepEqual(insertionEdit(block, ['---'], 'below'),
+      { edit: { fromLine: 4, toLine: 3, insert: ['', '---'] }, firstInsertedLine: 5 });
+  });
+  it('above inserts before the block', () => {
+    assert.deepEqual(insertionEdit(block, ['---'], 'above'),
+      { edit: { fromLine: 2, toLine: 1, insert: ['---', ''] }, firstInsertedLine: 2 });
   });
 });
