@@ -142,6 +142,12 @@ describe('ensureBlockId', () => {
     const r = ensureBlockId(l, { startLine: 0, endLine: 1, type: 'table' }, () => 'tbl1');
     assert.deepEqual(r.edit, { fromLine: 2, toLine: 1, insert: ['', '^tbl1'] });
   });
+  it('reuses an existing id line after tables and code fences', () => {
+    const l = doc('| a |\n| - |\n\n^tbl1');
+    const r = ensureBlockId(l, { startLine: 0, endLine: 1, type: 'table' }, () => 'zzz');
+    assert.equal(r.id, 'tbl1');
+    assert.equal(r.edit, null);
+  });
 });
 
 describe('insertionEdit', () => {

@@ -198,6 +198,10 @@ export function ensureBlockId(
   if (m) return { edit: null, id: m[1]! };
   const id = genId();
   if (block.type === 'table' || block.type === 'code-fence') {
+    if (lines[block.endLine + 1]?.trim() === '') {
+      const standalone = lines[block.endLine + 2]?.match(/^\^([A-Za-z0-9-]+)\s*$/);
+      if (standalone) return { edit: null, id: standalone[1]! };
+    }
     return { edit: { fromLine: block.endLine + 1, toLine: block.endLine, insert: ['', `^${id}`] }, id };
   }
   return { edit: { fromLine: block.endLine, toLine: block.endLine, insert: [`${last} ^${id}`] }, id };
