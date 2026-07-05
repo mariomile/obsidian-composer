@@ -1,0 +1,25 @@
+{
+  "name": "composer",
+  "version": "0.1.0",
+  "description": "Notion-style block handle: + insert menu and block actions for Obsidian.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "pnpm typecheck && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"src/**/*.test.ts\""
+  },
+  "author": "Mario Miletta",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
+    "@floating-ui/dom": "^1.6.13",
+    "@types/node": "^22.15.17",
+    "esbuild": "0.25.5",
+    "obsidian": "1.13.1",
+    "typescript": "^5.8.3"
+  }
+}

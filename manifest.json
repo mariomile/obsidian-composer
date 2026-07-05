@@ -1,0 +1,9 @@
+{
+  "id": "composer",
+  "name": "Composer",
+  "version": "0.1.0",
+  "minAppVersion": "1.10.0",
+  "description": "Notion-style block handle: + insert menu and block actions.",
+  "author": "Mario Miletta",
+  "isDesktopOnly": true
+}
