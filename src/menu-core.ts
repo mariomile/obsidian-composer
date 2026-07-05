@@ -16,6 +16,6 @@ export function filterItems<T extends { label: string; section: string; keywords
     (i) =>
       i.label.toLowerCase().includes(q) ||
       i.section.toLowerCase().includes(q) ||
-      (i.keywords ?? []).some((k) => k.toLowerCase().includes(q)),
+      (i.keywords ?? []).some((k) => k.toLowerCase().startsWith(q)),
   );
 }

@@ -15,8 +15,9 @@ describe('filterItems', () => {
   it('matches label case-insensitively', () => {
     assert.deepEqual(filterItems(items, 'tab').map((i) => i.label), ['Table']);
   });
-  it('matches keywords and section', () => {
-    assert.deepEqual(filterItems(items, 'database').map((i) => i.label), ['New Base']);
+  it('matches keywords by prefix and section by substring', () => {
+    assert.deepEqual(filterItems(items, 'data').map((i) => i.label), ['New Base']);
     assert.deepEqual(filterItems(items, 'embed').map((i) => i.label), ['Note embed']);
+    assert.deepEqual(filterItems(items, 'base').map((i) => i.label), ['New Base']);
   });
 });
