@@ -151,7 +151,7 @@ export default class ComposerPlugin extends Plugin {
     }
     const contentRect = cm.contentDOM.getBoundingClientRect();
     const left = Math.max(8, contentRect.left - HANDLE_WIDTH - 6);
-    this.handle.showAt(left, top - 1);
+    this.handle.showAt(left, top - 1, block.type !== 'blank');
   }
 
   private openMenu(

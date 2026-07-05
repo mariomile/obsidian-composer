@@ -11,6 +11,8 @@ Hover over a block (paragraph, heading, list item, callout, table, code fence, q
 - **＋ Insert** — opens a searchable menu to insert a new block below (⌥-click flips the default direction) the hovered block.
 - **⠿ Actions** — opens a menu of transforms and operations on the hovered block itself: turn into another block type, move up/down, duplicate, copy a block link, or delete.
 
+Empty lines get the handle too (＋ only): inserting there replaces the line in place, so a brand-new note is one hover away from its first block.
+
 Both menus support fuzzy filtering, arrow-key navigation, `Enter` to confirm, `Esc` to close, and close on outside click. All insertions are a single undo step.
 
 The handle only appears in Live Preview (desktop only) — it's inert in Reading view and does nothing over blank lines or frontmatter.

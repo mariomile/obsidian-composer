@@ -27,8 +27,9 @@ describe('fenceRanges', () => {
 });
 
 describe('blockAtLine', () => {
-  it('null on blank line and inside frontmatter', () => {
-    assert.equal(blockAtLine(doc('a\n\nb'), 1), null);
+  it('blank line is a blank block, frontmatter is null', () => {
+    assert.deepEqual(blockAtLine(doc('a\n\nb'), 1), { startLine: 1, endLine: 1, type: 'blank' });
+    assert.deepEqual(blockAtLine(doc(''), 0), { startLine: 0, endLine: 0, type: 'blank' });
     assert.equal(blockAtLine(doc('---\ntitle: x\n---\nbody'), 1), null);
   });
   it('heading is a single-line block', () => {
@@ -164,5 +165,12 @@ describe('insertionEdit', () => {
   it('above inserts before the block', () => {
     assert.deepEqual(insertionEdit(block, ['---'], 'above'),
       { edit: { fromLine: 2, toLine: 1, insert: ['---', ''] }, firstInsertedLine: 2 });
+  });
+  it('blank block is replaced in place, no separators', () => {
+    const blank = { startLine: 3, endLine: 3, type: 'blank' as const };
+    assert.deepEqual(insertionEdit(blank, ['# ', 'x'], 'below'),
+      { edit: { fromLine: 3, toLine: 3, insert: ['# ', 'x'] }, firstInsertedLine: 3 });
+    assert.deepEqual(insertionEdit(blank, ['---'], 'above'),
+      { edit: { fromLine: 3, toLine: 3, insert: ['---'] }, firstInsertedLine: 3 });
   });
 });

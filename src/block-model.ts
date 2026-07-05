@@ -1,6 +1,6 @@
 export type BlockType =
   | 'paragraph' | 'heading' | 'list-item' | 'quote' | 'callout'
-  | 'code-fence' | 'table' | 'embed' | 'hr';
+  | 'code-fence' | 'table' | 'embed' | 'hr' | 'blank';
 
 export interface Block {
   /** 0-based, inclusive */
@@ -86,7 +86,9 @@ export function blockAtLine(lines: string[], line: number): Block | null {
   }
 
   const text = lines[line]!;
-  if (text.trim() === '') return null;
+  // A blank line is an insert target of its own (the handle shows ＋ there;
+  // inserting replaces the line in place instead of adding separators).
+  if (text.trim() === '') return { startLine: line, endLine: line, type: 'blank' };
   if (HEADING_RE.test(text)) return { startLine: line, endLine: line, type: 'heading' };
   if (HR_RE.test(text)) return { startLine: line, endLine: line, type: 'hr' };
 
@@ -214,6 +216,13 @@ export function ensureBlockId(
 export function insertionEdit(
   block: Block, snippet: string[], where: 'above' | 'below',
 ): { edit: LineEdit; firstInsertedLine: number } {
+  if (block.type === 'blank') {
+    // Replace the blank line itself — no separators either side.
+    return {
+      edit: { fromLine: block.startLine, toLine: block.startLine, insert: snippet },
+      firstInsertedLine: block.startLine,
+    };
+  }
   if (where === 'below') {
     const at = block.endLine + 1;
     return {

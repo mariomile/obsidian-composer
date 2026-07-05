@@ -7,6 +7,7 @@ export interface GutterDeps {
 
 export class GutterHandle extends Component {
   private el: HTMLElement;
+  private gripEl: HTMLElement;
   private visible = false;
 
   constructor(deps: GutterDeps) {
@@ -14,10 +15,10 @@ export class GutterHandle extends Component {
     this.el = document.body.createDiv({ cls: 'composer-handle' });
     this.el.hide();
     this.makeBtn('plus', 'Insert block', (e) => deps.onPlus(e.altKey));
-    this.makeBtn('grip-vertical', 'Block actions', () => deps.onGrip());
+    this.gripEl = this.makeBtn('grip-vertical', 'Block actions', () => deps.onGrip());
   }
 
-  private makeBtn(icon: string, label: string, onClick: (e: MouseEvent) => void): void {
+  private makeBtn(icon: string, label: string, onClick: (e: MouseEvent) => void): HTMLElement {
     const btn = this.el.createDiv({
       cls: 'composer-handle-btn',
       attr: { 'aria-label': label, role: 'button' },
@@ -25,9 +26,12 @@ export class GutterHandle extends Component {
     setIcon(btn, icon);
     this.registerDomEvent(btn, 'mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     this.registerDomEvent(btn, 'click', (e) => { e.preventDefault(); onClick(e); });
+    return btn;
   }
 
-  showAt(left: number, top: number): void {
+  /** `showGrip: false` renders only ＋ (blank lines: nothing to act on yet). */
+  showAt(left: number, top: number, showGrip = true): void {
+    this.gripEl.toggle(showGrip);
     this.el.style.left = `${left}px`;
     this.el.style.top = `${top}px`;
     this.el.show();
