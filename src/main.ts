@@ -42,7 +42,12 @@ export default class ComposerPlugin extends Plugin {
     this.addSettingTab(new ComposerSettingTab(this.app, this));
 
     this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
-    this.registerDomEvent(document, 'wheel', () => this.dismiss(), { capture: true, passive: true });
+    // Scrolling the editor dismisses the handle/menu — but scrolling INSIDE
+    // the menu (its list has overflow-y) must not close it.
+    this.registerDomEvent(document, 'wheel', (e) => {
+      if (this.menu.containsTarget(e.target as Node)) return;
+      this.dismiss();
+    }, { capture: true, passive: true });
     this.registerDomEvent(document, 'keydown', (e) => {
       if (this.menu.isVisible()) return; // menu handles its own keys
       if (e.key === 'Escape') { this.dismiss(); return; }

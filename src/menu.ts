@@ -80,6 +80,10 @@ export class ComposerMenu extends Component {
     return this.visible;
   }
 
+  containsTarget(t: Node): boolean {
+    return this.el.contains(t);
+  }
+
   private onKey(e: KeyboardEvent): void {
     if (e.key === 'Escape') { e.preventDefault(); this.close(); return; }
     if (e.key === 'ArrowDown') { e.preventDefault(); this.setActive(this.activeIndex + 1); return; }
