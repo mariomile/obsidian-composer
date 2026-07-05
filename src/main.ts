@@ -74,7 +74,9 @@ export default class ComposerPlugin extends Plugin {
 
     const pos = ctx.cm.posAtCoords({ x: e.clientX, y: e.clientY }, false);
     const line = ctx.cm.state.doc.lineAt(pos).number - 1; // 0-based
-    if (line === this.lastLine && this.handle.isVisible()) return;
+    // Same line → handle already visible or the show-timer is pending; either
+    // way there is nothing to recompute or reschedule.
+    if (line === this.lastLine) return;
 
     const lines = ctx.editor.getValue().split('\n');
     const block = blockAtLine(lines, line);
@@ -94,6 +96,12 @@ export default class ComposerPlugin extends Plugin {
   }
 
   private positionHandle(cm: EditorView, block: Block): void {
+    // The block was derived when the timer was scheduled; the doc may have
+    // changed since. Re-validate before touching cm.state.doc.line().
+    if (block.startLine + 1 > cm.state.doc.lines) {
+      this.hideHandle();
+      return;
+    }
     const from = cm.state.doc.line(block.startLine + 1).from;
     const coords = cm.coordsAtPos(from);
     if (!coords) {
