@@ -55,6 +55,10 @@ pnpm build
 
 The build writes `main.js`, `manifest.json`, and `styles.css` into the plugin folder referenced by `.obsidian-plugin-dir` (your vault's `.obsidian/plugins/composer/`). Enable it from Obsidian's Community Plugins settings.
 
+## Mobile
+
+**Unsupported** — `isDesktopOnly: true` in `manifest.json`; the handle only appears in Live Preview and is desktop-only by design (see "How it works" above).
+
 ## Design
 
 Styling is geometry and hover/active states only — no permanent decorative surfaces. All colors, radii, and shadows come from Obsidian's own theme variables, so Composer adapts automatically to any theme, light or dark.
