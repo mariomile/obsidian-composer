@@ -182,6 +182,7 @@ function randomBlockId(): string {
 
 export function actionItems(deps: ItemDeps): ComposerItem[] {
   const items: ComposerItem[] = [];
+  const commands = (deps.app as unknown as { commands: CommandRegistry }).commands;
 
   for (const t of TURN_TARGETS) {
     items.push({
@@ -225,6 +226,22 @@ export function actionItems(deps: ItemDeps): ComposerItem[] {
         new Notice('Block link copied');
       }),
     },
+  );
+
+  if (commands.findCommand('aiditor:annotate-selection')) {
+    items.push({
+      id: 'annotate', label: 'Annotate', icon: 'message-square-plus', section: 'Actions',
+      keywords: ['annotate', 'aiditor', 'comment', 'note'],
+      run: () => withBlock(deps, (_lines, block) => {
+        // Land the cursor on the block's first line, then hand off to AIditor's
+        // editor-command so it annotates THIS block. Never mutate the block.
+        deps.editor.setCursor({ line: block.startLine, ch: 0 });
+        commands.executeCommandById('aiditor:annotate-selection');
+      }),
+    });
+  }
+
+  items.push(
     {
       id: 'delete', label: 'Delete', icon: 'trash-2', section: 'Actions',
       keywords: ['delete', 'remove'],
