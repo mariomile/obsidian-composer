@@ -238,8 +238,8 @@ export function actionItems(deps: ItemDeps): ComposerItem[] {
 
   if (commands.findCommand('aiditor:annotate-selection')) {
     items.push({
-      id: 'annotate', label: 'Annotate', icon: 'message-square-plus', section: 'Actions',
-      keywords: ['annotate', 'aiditor', 'comment', 'note'],
+      id: 'annotate', label: 'Comment', icon: 'message-square', section: 'Actions',
+      keywords: ['comment', 'annotate', 'aiditor', 'note'],
       run: () => withBlock(deps, (_lines, block) => {
         // Land the cursor on the block's first line, then hand off to AIditor's
         // editor-command so it annotates THIS block. Never mutate the block.
