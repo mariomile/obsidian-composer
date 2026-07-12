@@ -63,3 +63,13 @@ export function resolveBlock(
   const block = blockAtLine(lines, line);
   return block ? { lines, block } : null;
 }
+
+/** Guard destructive menu actions against sync/async document drift. */
+export function blockMatchesSnapshot(
+  lines: readonly string[],
+  block: Block,
+  snapshot: readonly string[],
+): boolean {
+  const current = lines.slice(block.startLine, block.endLine + 1);
+  return current.length === snapshot.length && current.every((line, i) => line === snapshot[i]);
+}

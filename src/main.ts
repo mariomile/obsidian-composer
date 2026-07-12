@@ -160,11 +160,15 @@ export default class ComposerPlugin extends Plugin {
     const cur = this.current;
     const rect = this.handle.anchorRect();
     if (!cur || !rect) return;
+    const lines = cur.ctx.editor.getValue().split('\n');
+    const liveBlock = blockAtLine(lines, cur.block.startLine);
+    if (!liveBlock) return;
     const deps: ItemDeps = {
       app: this.app,
       editor: cur.ctx.editor,
       view: cur.ctx.view,
-      blockLine: cur.block.startLine,
+      blockLine: liveBlock.startLine,
+      blockSnapshot: lines.slice(liveBlock.startLine, liveBlock.endLine + 1),
       where,
       settings: this.settings,
     };

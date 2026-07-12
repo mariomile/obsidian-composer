@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLineEdit } from './actions.ts';
+import { applyLineEdit, blockMatchesSnapshot } from './actions.ts';
 import type { Editor } from 'obsidian';
 
 /** Minimal fake Editor over an array of lines — only what applyLineEdit touches. */
@@ -59,5 +59,21 @@ describe('applyLineEdit', () => {
     const { editor, state } = fakeEditor(['a', 'b']);
     applyLineEdit(editor, { fromLine: 0, toLine: 1, insert: [] });
     assert.deepEqual(state.lines, ['']);
+  });
+});
+
+describe('blockMatchesSnapshot', () => {
+  it('accepts the unchanged target block', () => {
+    assert.equal(
+      blockMatchesSnapshot(['before', 'target', 'after'], { startLine: 1, endLine: 1, type: 'paragraph' }, ['target']),
+      true,
+    );
+  });
+
+  it('rejects a different block shifted into the original line', () => {
+    assert.equal(
+      blockMatchesSnapshot(['inserted', 'before', 'target'], { startLine: 1, endLine: 1, type: 'paragraph' }, ['target']),
+      false,
+    );
   });
 });

@@ -6,7 +6,13 @@ import {
 } from './block-model.ts';
 import type { ComposerItem } from './menu-core.ts';
 import { BASIC_SNIPPETS, type Snippet } from './snippets.ts';
-import { insertSnippet, performEdit, applyLineEdit, resolveBlock } from './actions.ts';
+import {
+  insertSnippet,
+  performEdit,
+  applyLineEdit,
+  blockMatchesSnapshot,
+  resolveBlock,
+} from './actions.ts';
 import {
   FilePicker, mdNotes, imageFiles, canvasFiles, filesInFolder, embedTextFor, baseFiles,
 } from './pickers.ts';
@@ -19,6 +25,8 @@ export interface ItemDeps {
   /** Start line of the hovered block — the block itself is re-derived from the
    *  live document when an item runs (async pickers can outlive the snapshot). */
   blockLine: number;
+  /** Exact block content when the menu opened; guards every deferred action. */
+  blockSnapshot: string[];
   where: 'above' | 'below';
   settings: ComposerSettings;
 }
@@ -42,7 +50,7 @@ function withBlock(
   fn: (lines: string[], block: Block) => void | Promise<void>,
 ): void | Promise<void> {
   const target = resolveBlock(deps.editor, deps.blockLine);
-  if (!target) {
+  if (!target || !blockMatchesSnapshot(target.lines, target.block, deps.blockSnapshot)) {
     new Notice('Block not found — the note changed');
     return;
   }
