@@ -65,4 +65,4 @@ Styling is geometry and hover/active states only — no permanent decorative sur
 
 ---
 
-Part of the marioverse plugin suite.
+Part of the marioverse Obsidian plugin suite.
