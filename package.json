@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "pnpm typecheck && node esbuild.config.mjs production",
+    "release:check": "pnpm test && pnpm build",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"src/**/*.test.ts\""
   },
