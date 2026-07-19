@@ -1,5 +1,6 @@
 import { MarkdownView, Plugin, type Editor } from 'obsidian';
 import type { EditorView } from '@codemirror/view';
+import type { Text } from '@codemirror/state';
 import { blockAtLine, type Block } from './block-model.ts';
 import { GutterHandle } from './gutter.ts';
 import { ComposerMenu } from './menu.ts';
@@ -22,6 +23,7 @@ export default class ComposerPlugin extends Plugin {
   private current: { ctx: EditorContext; block: Block; anchorTop: number | null } | null = null;
   private lastLine: number | null = null;
   private showTimer = 0;
+  private lineCache: { doc: Text; lines: string[] } | null = null;
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -115,7 +117,7 @@ export default class ComposerPlugin extends Plugin {
     // way there is nothing to recompute or reschedule.
     if (line === this.lastLine) return;
 
-    const lines = ctx.editor.getValue().split('\n');
+    const lines = this.documentLines(ctx.cm);
     const block = blockAtLine(lines, line);
     if (!block) {
       this.hideHandle();
@@ -160,7 +162,7 @@ export default class ComposerPlugin extends Plugin {
     const cur = this.current;
     const rect = this.handle.anchorRect();
     if (!cur || !rect) return;
-    const lines = cur.ctx.editor.getValue().split('\n');
+    const lines = this.documentLines(cur.ctx.cm);
     const liveBlock = blockAtLine(lines, cur.block.startLine);
     if (!liveBlock) return;
     const deps: ItemDeps = {
@@ -182,6 +184,14 @@ export default class ComposerPlugin extends Plugin {
 
   private openActionsMenu(): void {
     this.openMenu('below', actionItems);
+  }
+
+  private documentLines(cm: EditorView): string[] {
+    const doc = cm.state.doc;
+    if (this.lineCache?.doc === doc) return this.lineCache.lines;
+    const lines = doc.toString().split('\n');
+    this.lineCache = { doc, lines };
+    return lines;
   }
 
   onunload(): void {
