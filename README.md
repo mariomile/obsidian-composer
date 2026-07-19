@@ -4,6 +4,8 @@ A Notion-style block handle for Obsidian: hover any block in Live Preview to rev
 
 ![Composer insert menu](docs/menu.png)
 
+![Composer block handle in a real note](docs/block-handle.png)
+
 ## How it works
 
 Hover over a block (paragraph, heading, list item, callout, table, code fence, quote…) and a small handle appears in the left gutter. It has two buttons:
