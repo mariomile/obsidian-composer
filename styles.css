@@ -1,4 +1,7 @@
 /* ===== Composer — block handle ===== */
+:root {
+  --composer-wash: var(--cosmos-t-fast, 120ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
+}
 .composer-handle {
   position: fixed;
   z-index: var(--layer-popover);
@@ -6,7 +9,7 @@
   align-items: center;
   gap: 1px;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--cosmos-t-fast, 120ms) var(--cosmos-native, ease);
 }
 .composer-handle.is-visible {
   opacity: 1;
@@ -17,9 +20,10 @@
   justify-content: center;
   width: 21px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--mv-r1, 6px);
   color: var(--text-faint);
   cursor: pointer;
+  transition: color var(--composer-wash), background-color var(--composer-wash);
 }
 .composer-handle-btn:hover {
   color: var(--text-muted);
@@ -42,8 +46,8 @@
   padding: 6px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-s);
+  border-radius: var(--cosmos-r-floating-surface, 12px);
+  box-shadow: var(--cosmos-pop-shadow, var(--shadow-s));
 }
 .composer-menu-search {
   flex: 0 0 auto;
@@ -68,9 +72,9 @@
 }
 .composer-menu-section {
   padding: 8px 8px 3px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-size: var(--font-ui-smaller, 10.5px);
+  font-weight: var(--font-medium, 500);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
 }
@@ -79,10 +83,11 @@
   align-items: center;
   gap: 9px;
   padding: 5px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: var(--font-ui-small);
   color: var(--text-normal);
   cursor: pointer;
+  transition: background-color var(--composer-wash);
 }
 .composer-menu-item.is-active {
   background: var(--background-modifier-hover);
@@ -98,5 +103,34 @@
 .composer-menu-empty {
   padding: 12px 8px;
   color: var(--text-faint);
-  font-size: var(--font-ui-small);
+  font-size: var(--font-ui-smaller);
+}
+
+/* ===== Composer — phone touch targets (mv-kit §2/§3) ===== */
+@media (pointer: coarse) {
+  .composer-handle-btn {
+    min-width: var(--cosmos-touch-min, 44px);
+    min-height: var(--cosmos-touch-min, 44px);
+  }
+  .composer-menu-item {
+    min-height: var(--cosmos-touch-min, 44px);
+  }
+  .composer-handle-btn {
+    transition: color var(--composer-wash), background-color var(--composer-wash),
+      transform var(--cosmos-t-fast, 120ms) var(--cosmos-native, ease);
+  }
+  .composer-menu-item {
+    transition: background-color var(--composer-wash),
+      transform var(--cosmos-t-fast, 120ms) var(--cosmos-native, ease);
+  }
+  .composer-handle-btn:active,
+  .composer-menu-item:active {
+    transform: scale(var(--cosmos-press-scale, 0.98));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .composer-handle-btn,
+    .composer-menu-item {
+      transition: none;
+    }
+  }
 }
