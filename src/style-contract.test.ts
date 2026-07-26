@@ -84,6 +84,30 @@ describe('mv-kit style contract', () => {
     assert.deepEqual(violations, []);
   });
 
+  // mv-kit.md §6 "Elevation hierarchy" MUST: a floating surface consumes the
+  // matching tier token *with its canonical fallback*. A second var()
+  // indirection (`var(--cosmos-pop-shadow, var(--shadow-s))`) satisfies the
+  // token half but not the fallback half: with Cosmos absent the menu
+  // silently degrades to Obsidian's generic small shadow instead of the
+  // kit's Pop elevation, which is exactly what the theme-independence
+  // golden rule forbids. Fixed for `.composer-menu` in the §6 dinamica wave
+  // (2026-07); same shape obsidian-aiditor already ships.
+  it('pop-tier box-shadow falls back to the canonical literal, not another var()', () => {
+    const code = stripComments(css);
+    const popUsages = [...code.matchAll(/var\(\s*--cosmos-pop-shadow\s*,([^;]*)\);/g)];
+
+    assert.ok(
+      popUsages.length > 0,
+      'expected at least one --cosmos-pop-shadow consumer in styles.css',
+    );
+
+    const indirectFallbacks = popUsages
+      .map((match) => (match[1] ?? '').trim())
+      .filter((fallback) => fallback.includes('var('));
+
+    assert.deepEqual(indirectFallbacks, []);
+  });
+
   it('caps !important declarations at the post-mv-kit-audit count (ratchet down only)', () => {
     const importantCount = (css.match(/!important;/g) ?? []).length;
     // Ceiling set exactly at the post-fix count landed by the wave-10 mv-kit
