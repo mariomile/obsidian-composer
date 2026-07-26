@@ -213,3 +213,70 @@ integrity guards, `!important` ceiling) continue to pass unmodified.
   against the kit's phone column, not by rendering on a device (and
   `EmulateMobile` was not used, per the hard constraint against it killing
   Node-dependent plugins).
+
+## Correction — Pop-tier fallback (same §6 wave, re-audit pass)
+
+The Elevation-hierarchy row above recorded `.composer-menu`'s
+`box-shadow: var(--cosmos-pop-shadow, var(--shadow-s))` as
+"pass, already compliant". **That verdict was wrong and is corrected here**
+(append-only: the original row stays as written, this section supersedes its
+conclusion).
+
+§6's MUST is *"consumes the matching tier token **with its canonical
+fallback**"*, and the tier table pins that canonical value literally:
+`rgba(0,0,0,.28) 0 12px 32px, rgba(0,0,0,.16) 0 2px 8px`. A second `var()`
+indirection satisfies the token half of the MUST but not the fallback half —
+with Cosmos absent (the audit's own "Golden rule — theme-independent
+consumption" at the top of this file), `var(--shadow-s)` resolves to
+Obsidian's generic small shadow, which is a *different, flatter* elevation
+than the Pop tier the surface is supposed to have. The plugin must look right
+without the theme; that is precisely the case this fallback governs.
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.composer-menu` `box-shadow` | was `var(--cosmos-pop-shadow, var(--shadow-s))` → now `var(--cosmos-pop-shadow, rgba(0, 0, 0, 0.28) 0px 12px 32px, rgba(0, 0, 0, 0.16) 0px 2px 8px)` | N/A — `isDesktopOnly: true`, plugin never loads on phone | **fixed this wave.** Token unchanged (Pop was already the right tier for a menu that closes on outside-click); only the fallback changed, from an indirection to the kit's canonical literal. Precedent: `obsidian-aiditor/styles.css:63` already ships this exact shape. Light-theme note: Cosmos overrides `--cosmos-pop-shadow` for `body.theme-light`, so a Cosmos user still gets the tuned light value — the literal is the no-Cosmos floor, not a hardcoded dark look. |
+
+Scope of the correction: one declaration, one `box-shadow` fallback. No tier
+re-assignment, no new token, nothing defined at `:root`, no other rule
+touched. Every other §6 verdict in the section above stands unchanged —
+hover richness (colour-only, correctly `--mv-wash`-eased, hover-gate
+inapplicable on a desktop-only mousemove-revealed surface), drag polish
+("N/A, nessuna superficie di questo tipo"), and panel/tab transitions
+("N/A, nessuna superficie di questo tipo") were all re-checked against the
+commit-pinned §6 text and re-confirmed.
+
+### Style contract — one assertion added (red-green verified)
+
+The "no new assertions" section above applied to the original
+full-compliance verdict; this correction found a real violation, so it gets
+its guard. `src/style-contract.test.ts` gains exactly one assertion,
+`pop-tier box-shadow falls back to the canonical literal, not another var()`,
+which walks every `var(--cosmos-pop-shadow, …)` consumer and rejects any
+whose fallback itself contains `var(`.
+
+Red-green evidence, in order:
+
+1. Assertion written first, run against the **pre-fix** `styles.css` →
+   **59 tests / 17 suites, 58 pass, 1 fail** — the new assertion failing on
+   ` var(--shadow-s)`.
+2. `styles.css` fixed → **59 tests / 17 suites, 59 pass, 0 fail**.
+
+No speculative assertions: the other §6 rules (hover gating, lift ≤ 2px,
+drag transform-only) have no corresponding surface in this plugin, so they
+get no guard.
+
+### Verification (this correction)
+
+- `pnpm release:check` (test + typecheck + build) — **exit 0**.
+  **59 tests / 17 suites, 59 pass / 0 fail** (58 pre-existing + 1 new).
+  `tsc --noEmit` — 0 errors. `esbuild.config.mjs production` — build
+  succeeded.
+- **No lint script exists in this repo** — `package.json` declares only
+  `dev`, `build`, `release:check`, `typecheck`, `test`. Stated explicitly
+  rather than substituted with an invented one.
+- `!important` count: still 0 (ceiling assertion unchanged, still at floor).
+- No `:root` token definitions added. The new CSS comment contains no token
+  glob followed by a slash — the comment-integrity assertion covers this and
+  passes.
+- `EmulateMobile` not used, per the standing constraint; phone verdicts rest
+  on `manifest.json`'s `isDesktopOnly: true`, read directly.
