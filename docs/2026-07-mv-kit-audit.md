@@ -118,3 +118,98 @@ renders identically.
   wave (no live vault-reload check run in this session); phone changes are
   verified by reading the resulting CSS values against the kit's phone
   column, per the hard constraint against `EmulateMobile`.
+
+---
+
+# §6 — wave 2026-07 dinamica
+
+Audit of `styles.css` (136 lines, unchanged by this wave — see verdict
+below) + `src/gutter.ts`/`src/menu.ts`/`src/main.ts` against
+`obsidian-cosmos-theme/docs/mv-kit.md` §6 ("Elevation & motion depth",
+landed cosmos-theme commit `10f5ddc`), both desktop and phone columns.
+Scope: the four §6 sub-rules only (elevation hierarchy, hover richness,
+drag polish, panel/tab transitions) — coherence-only, no layout redesign,
+no new components, matching the model waves' non-goals
+(obsidian-portal `389d564`, obsidian-tabx `cc65cd4`).
+
+**Structural note carried through every row below:** `manifest.json` sets
+`"isDesktopOnly": true` — Composer never loads on phone at all (confirmed,
+not assumed: `cat manifest.json`). Every "Phone" column in this section is
+therefore N/A by construction, not by per-surface judgement — recorded once
+here rather than repeated seven times in the tables.
+
+## Elevation hierarchy
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.composer-menu` (insert/actions menu) `box-shadow` | `var(--cosmos-pop-shadow, var(--shadow-s))` (landed wave 10) | N/A — desktop-only plugin | **pass, already compliant** — this is exactly the kit's Pop tier definition (menu/popover/dropdown, closes on outside-click); `src/menu.ts`'s `close()` is wired to a document-level outside-click listener, confirming the dismiss behaviour matches the tier. Re-verified this wave, not re-fixed — wave 10 already landed this token correctly. |
+| `.composer-handle` (the floating +/⋮⋮ gutter button pair) | no `box-shadow` at all — flat, borderless, icon-only buttons on a transparent flex wrapper | N/A | **pass, correctly Flat tier** — the handle is inline chrome that appears next to the cursor's line, not a floating/dismissable surface in §6's sense (it disappears on `mousemove` leaving the gutter zone, not on outside-click); no shadow is the correct answer, matching the kit's Flat-tier row verbatim. |
+| Two tiers stacked on one element (Pop shadow **and** glass blur) | not present | not present | **pass, not applicable** — `grep -n "blur\|glass" styles.css`: zero hits. Nothing to stack. |
+| Island / Glass tier surfaces of Composer's own | none exist | none exist | **waived, nothing to tokenize** — Composer renders no persistent sidebar/panel and no glass-blur command-bar-style surface; its only floating chrome is the one Pop-tier menu above. |
+
+## Hover richness
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.composer-handle-btn:hover` | colour wash only (`color` + `background`), ungated by `@media (hover: hover)` | N/A — `isDesktopOnly: true`, and independently the handle itself never renders on touch: its only show trigger is `document.addEventListener('mousemove', …)` in `src/main.ts` (`registerDomEvent(document, 'mousemove', …)`), with no `touchstart`/`pointerdown`/click-to-reveal path anywhere in `gutter.ts` or `main.ts` — confirmed via `grep -n "touchstart\|pointerdown\|showAt" src/main.ts src/gutter.ts`, the only call site of `showAt()` is inside the mousemove handler | **pass, correctly colour-only; hover-gate MUST does not apply** — the kit's ungated-hover MUST NOT is scoped to "phone-reachable elements" specifically (its own wording: "plugins must not fight it with custom `:hover` outside that media query on phone-reachable elements"). `.composer-handle-btn` fails that precondition twice over (desktop-only manifest, and a mouse-only reveal mechanism even hypothetically on a touch build), so there is no stuck-hover failure mode to gate against. Left ungated deliberately, not overlooked — gating it would be adding a no-op media query, not fixing anything. Richness itself (wash, no lift) is correct: this is a small icon-button row action, the kit's own `.row:hover` case, not a `.card:hover` case. |
+| `.composer-menu-item.is-active` (keyboard/mouse selection highlight inside the menu) | colour wash (`background`), driven by a `.is-active` class toggle in `src/menu-core.ts`, not a `:hover` pseudo-class | N/A | **pass, not a hover surface** — selection state is applied via class toggle (keyboard arrow-navigation and mouse-move both call the same `setActive` path), so it was never a candidate for the hover-gate MUST in the first place; correctly colour-only richness for a list row. |
+| `--mv-wash` vs `--mv-lift` used correctly | `--composer-wash` (the file's one shared transition custom property, defined `:root`-scoped but itself namespaced `--composer-*`, not `--mv-*`/`--cosmos-*`) resolves to `var(--cosmos-t-fast, 120ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1))` — pure colour-wash easing | same | **pass, verified not assumed** — `grep -n "mv-lift\|mv-wash" styles.css`: zero `--mv-lift` occurrences anywhere in the file (Composer has no lift/transform hover in it to mis-tag), one `--mv-wash` consumption site, used correctly on the only two colour-transition sites (`.composer-handle-btn`, `.composer-menu-item`). No mixing to fix. |
+
+## Drag polish
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| Any Composer-owned drag interaction (`.is-dragging`/`.is-dropped` or equivalent) | **does not exist** | N/A | **waived, nothing to audit.** Verified, not assumed: `grep -n "draggable\|dragstart\|dragover\|\bdrop\b" src/*.ts` (excluding test files) returns zero hits. The two `.style.left`/`.style.top` writes in the codebase (`gutter.ts:35-36`, `menu.ts:61-62`) are one-shot *positioning* on open (placing the handle/menu next to the cursor), not drag-frame updates — neither element is ever draggable, and neither writes `left`/`top` on a pointer-move loop the way a real drag would. No conflict with native drag to verify either, since Composer has no draggable element for native drag to conflict with. |
+
+## Panel & tab transitions
+
+| Motion | Desktop | Phone | Verdict |
+|---|---|---|---|
+| Panel/sidebar open-close | Composer owns no persistent panel/sidebar | N/A | **waived, not applicable** — Composer's only chrome is the transient handle (Flat, mousemove-driven) and the transient menu (Pop, click-to-open/outside-click-to-close); neither is a persistent layout panel in §6's sense. |
+| Tab-content swap (crossfade vs. slide) | Composer renders no tab-content swap of its own | N/A | **waived, not applicable** — no tab surface exists anywhere in the plugin; `grep -n "@keyframes\|slide" styles.css`: zero hits. |
+| `.composer-menu` open/close | uses Obsidian's `.show()`/`.hide()` display toggle (`src/menu.ts`), no transition at all on open | N/A | **pre-existing gap, re-confirmed not re-litigated this wave** — already flagged as a genuine, deliberately-deferred §3 finding in wave 10's audit (the `cosmos-pop-in` entrance recipe), not a §6 duration/easing-tier defect: there's no transition to put on the wrong tier because there's no transition at all yet. Re-reading it under §6 doesn't change the verdict or reopen the deferral; flagged once, in wave 10, stays flagged there. Not duplicated as a new §6 finding to avoid the audit trail double-counting the same gap under two section headers. |
+
+## Style contract — no new assertions
+
+No §6 violation was found to fix this wave, so per the brief's own
+instruction ("If the audit found full compliance, leave the test file
+untouched"), `src/style-contract.test.ts` is untouched — zero speculative
+assertions added. The existing 4 assertions (raw-value scan, comment-
+integrity guards, `!important` ceiling) continue to pass unmodified.
+
+## Not touched (explicit non-goals, confirmed out of scope)
+
+- No CSS changes anywhere — `styles.css` is byte-identical before and
+  after this wave (`git diff --stat` for this wave shows no hunk against
+  the file; verified via `shasum` before starting and again before
+  committing this doc).
+- `.composer-handle-btn:hover`'s hover-gate was evaluated and deliberately
+  left ungated — see the Hover richness row above for the two independent
+  reasons (desktop-only manifest, mouse-only reveal mechanism) that make
+  the kit's stuck-hover MUST NOT inapplicable here, not overlooked.
+- `.composer-menu`'s missing open-transition (`cosmos-pop-in`) stays
+  flagged under wave 10's §3 finding, not re-opened or re-fixed here — it
+  is a "no transition exists yet" gap (§3's entrance-animation MUST),
+  distinct from this wave's §6 scope (which governs the *tier* of an
+  existing transition, and whether hover/drag/panel motion already present
+  uses the right easing/duration).
+
+## Verification
+
+- `pnpm release:check` (test + typecheck + build) — **exit 0**. Real
+  numbers from this wave's run: **58 tests / 17 suites, 58 pass / 0 fail**
+  (54 pre-existing + the 4 `style-contract.test.ts` assertions landed in
+  wave 10, both counted together now that the glob picks the file up;
+  no new test added this wave, per the brief — full compliance means the
+  test file stays untouched). `tsc --noEmit` — 0 errors. `esbuild.config.mjs
+  production` — build succeeded.
+- No lint script exists in this repo (`package.json` has no `lint` entry)
+  — reported honestly, same as wave 10, not invented for this wave.
+- `!important` count: 0 (unchanged — no CSS edited).
+- Desktop/phone screenshot verification: **pending**, same standing
+  constraint as wave 10 — not performed this wave; Composer's
+  `isDesktopOnly: true` manifest and the mouse-only reveal path for its one
+  hover surface are verified by reading `manifest.json` and `src/*.ts`
+  against the kit's phone column, not by rendering on a device (and
+  `EmulateMobile` was not used, per the hard constraint against it killing
+  Node-dependent plugins).
