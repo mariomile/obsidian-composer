@@ -21,11 +21,16 @@ export class GutterHandle extends Component {
   private makeBtn(icon: string, label: string, onClick: (e: MouseEvent) => void): HTMLElement {
     const btn = this.el.createDiv({
       cls: 'composer-handle-btn',
-      attr: { 'aria-label': label, role: 'button' },
+      attr: { 'aria-label': label, role: 'button', tabindex: '0' },
     });
     setIcon(btn, icon);
     this.registerDomEvent(btn, 'mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     this.registerDomEvent(btn, 'click', (e) => { e.preventDefault(); onClick(e); });
+    this.registerDomEvent(btn, 'keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      btn.click();
+    });
     return btn;
   }
 
