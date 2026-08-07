@@ -4,7 +4,7 @@ import { blockAtLine, fenceRanges, frontmatterRange } from './block-model.ts';
 import {
   turnInto, duplicateBlock, deleteBlock, moveBlock,
   ensureBlockId, insertionEdit, stripLine,
-  indentBlock, dropTargets, moveBlockTo,
+  indentBlock, dropTargets, moveBlockTo, sectionBlock,
 } from './block-model.ts';
 
 const doc = (s: string) => s.split('\n');
@@ -133,6 +133,58 @@ describe('moveBlock', () => {
   });
   it('null at document edge', () => {
     assert.equal(moveBlock(l, { startLine: 0, endLine: 0, type: 'paragraph' }, 'up'), null);
+  });
+});
+
+describe('sectionBlock', () => {
+  const H = (line: number) => ({ startLine: line, endLine: line, type: 'heading' as const });
+
+  it('spans to the next heading of the same level, trimming trailing blanks', () => {
+    const l = doc('# A\n\nbody\n\n# B');
+    assert.deepEqual(sectionBlock(l, H(0)), { startLine: 0, endLine: 2, type: 'heading' });
+  });
+  it('absorbs deeper subheadings', () => {
+    const l = doc('# A\n\n## A1\nx\n\n# B');
+    assert.deepEqual(sectionBlock(l, H(0)), { startLine: 0, endLine: 3, type: 'heading' });
+  });
+  it('stops at a shallower heading', () => {
+    const l = doc('## A1\nx\n# B');
+    assert.deepEqual(sectionBlock(l, H(0)), { startLine: 0, endLine: 1, type: 'heading' });
+  });
+  it('ignores a # line inside a code fence', () => {
+    const l = doc('# A\n```\n# not a heading\n```\ntail\n# B');
+    assert.deepEqual(sectionBlock(l, H(0)), { startLine: 0, endLine: 4, type: 'heading' });
+  });
+  it('runs to end of document when nothing follows', () => {
+    const l = doc('# A\nbody');
+    assert.deepEqual(sectionBlock(l, H(0)), { startLine: 0, endLine: 1, type: 'heading' });
+  });
+  it('leaves non-heading blocks alone', () => {
+    const l = doc('- a\n- b');
+    const b = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    assert.deepEqual(sectionBlock(l, b), b);
+  });
+});
+
+describe('moveBlock with headings', () => {
+  it('swaps whole sections, not just the title lines', () => {
+    const l = doc('# A\nbodyA\n\n# B\nbodyB');
+    const r = moveBlock(l, { startLine: 0, endLine: 0, type: 'heading' }, 'down')!;
+    const after = [...l];
+    after.splice(r.edit.fromLine, r.edit.toLine - r.edit.fromLine + 1, ...r.edit.insert);
+    assert.deepEqual(after, ['# B', 'bodyB', '', '# A', 'bodyA']);
+  });
+  it('swaps sibling subsections without disturbing the parent', () => {
+    const l = doc('# A\n\n## A1\nx\n\n## A2\ny');
+    const r = moveBlock(l, { startLine: 5, endLine: 5, type: 'heading' }, 'up')!;
+    const after = [...l];
+    after.splice(r.edit.fromLine, r.edit.toLine - r.edit.fromLine + 1, ...r.edit.insert);
+    assert.deepEqual(after, ['# A', '', '## A2', 'y', '', '## A1', 'x']);
+  });
+  it('refuses to move a subsection out of its parent', () => {
+    const l = doc('# A\n\n## A1\nx\n\n# B');
+    assert.equal(moveBlock(l, { startLine: 2, endLine: 2, type: 'heading' }, 'up'), null);
+    assert.equal(moveBlock(l, { startLine: 2, endLine: 2, type: 'heading' }, 'down'), null);
   });
 });
 

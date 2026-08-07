@@ -182,12 +182,74 @@ function adjacentBlock(lines: string[], block: Block, dir: 'up' | 'down'): Block
   return blockAtLine(lines, probe);
 }
 
+export function headingLevel(line: string): number {
+  const m = line.match(/^(#{1,6})\s/);
+  return m ? m[1]!.length : 0;
+}
+
+function fenceGuard(lines: string[]): (i: number) => boolean {
+  const fences = fenceRanges(lines);
+  return (i) => fences.some(([s, e]) => i >= s && i <= e);
+}
+
+/** A heading plus everything beneath it, up to the next heading of the same
+ *  or shallower level — what reordering a heading should carry with it.
+ *  Non-heading blocks are returned unchanged. Deliberately used only by the
+ *  REORDER paths (drag, move up/down): Delete/Duplicate/Turn into stay on the
+ *  heading line, where swallowing a whole section would be a footgun rather
+ *  than a convenience. */
+export function sectionBlock(lines: string[], block: Block): Block {
+  if (block.type !== 'heading') return block;
+  const level = headingLevel(lines[block.startLine]!);
+  const inFence = fenceGuard(lines);
+  let end = block.startLine;
+  for (let i = block.startLine + 1; i < lines.length; i++) {
+    // A '#' line inside a code fence is content, not a heading.
+    if (!inFence(i)) {
+      const l = headingLevel(lines[i]!);
+      if (l > 0 && l <= level) break;
+    }
+    end = i;
+  }
+  while (end > block.startLine && lines[end]!.trim() === '') end--;
+  return { ...block, endLine: end };
+}
+
+/** Nearest heading line above `before`, ignoring fenced content. */
+function precedingHeading(lines: string[], before: number): number | null {
+  const inFence = fenceGuard(lines);
+  for (let i = before - 1; i >= 0; i--) {
+    if (!inFence(i) && headingLevel(lines[i]!) > 0) return i;
+  }
+  return null;
+}
+
+/** The section a heading should swap with, or null when the swap would take
+ *  it out of its parent (its neighbour is a shallower heading). */
+function siblingSection(lines: string[], self: Block, dir: 'up' | 'down'): Block | null {
+  const level = headingLevel(lines[self.startLine]!);
+  if (dir === 'up') {
+    const h = precedingHeading(lines, self.startLine);
+    if (h === null) return adjacentBlock(lines, self, 'up'); // content before any heading
+    if (headingLevel(lines[h]!) !== level) return null;
+    return sectionBlock(lines, blockAtLine(lines, h)!);
+  }
+  const next = adjacentBlock(lines, self, 'down');
+  if (!next) return null;
+  if (next.type !== 'heading') return next;
+  // sectionBlock already absorbed any deeper heading, so this one is <= level.
+  return headingLevel(lines[next.startLine]!) < level ? null : sectionBlock(lines, next);
+}
+
 export function moveBlock(
   lines: string[], block: Block, dir: 'up' | 'down',
 ): { edit: LineEdit; cursorLine: number } | null {
-  const other = adjacentBlock(lines, block, dir);
+  const self = sectionBlock(lines, block);
+  const other = self.type === 'heading'
+    ? siblingSection(lines, self, dir)
+    : adjacentBlock(lines, self, dir);
   if (!other) return null;
-  const [first, second] = dir === 'up' ? [other, block] : [block, other];
+  const [first, second] = dir === 'up' ? [other, self] : [self, other];
   const a = lines.slice(first.startLine, first.endLine + 1);
   const b = lines.slice(second.startLine, second.endLine + 1);
   const gap = lines.slice(first.endLine + 1, second.startLine);

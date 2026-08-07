@@ -1,7 +1,7 @@
 import { MarkdownView, Plugin, type Editor } from 'obsidian';
 import type { EditorView } from '@codemirror/view';
 import type { Text } from '@codemirror/state';
-import { blockAtLine, type Block } from './block-model.ts';
+import { blockAtLine, sectionBlock, type Block } from './block-model.ts';
 import { GutterHandle } from './gutter.ts';
 import { ComposerMenu } from './menu.ts';
 import { insertItems, actionItems, type ItemDeps } from './items.ts';
@@ -236,8 +236,11 @@ export default class ComposerPlugin extends Plugin {
     const cur = this.current;
     if (!cur) return;
     const lines = this.documentLines(cur.ctx.cm);
-    const liveBlock = blockAtLine(lines, cur.block.startLine);
-    if (!liveBlock) return;
+    const hovered = blockAtLine(lines, cur.block.startLine);
+    if (!hovered) return;
+    // Dragging a heading carries its whole section, the way reordering an
+    // outline entry does. Other block types come back unchanged.
+    const liveBlock = sectionBlock(lines, hovered);
 
     const cm = cur.ctx.cm;
     const doc = cm.state.doc;
