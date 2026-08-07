@@ -1,6 +1,19 @@
-import type { Editor } from 'obsidian';
+import type { App, Editor } from 'obsidian';
 import { blockAtLine, insertionEdit, type Block, type LineEdit } from './block-model.ts';
 import type { Snippet } from './snippets.ts';
+
+interface VaultConfig {
+  getConfig(setting: string): unknown;
+}
+
+/** The vault's own list-indent unit — same source Obsidian's native
+ *  `editor:indent-list` command reads — so Composer never has to guess one. */
+export function vaultIndentUnit(app: App): string {
+  const vault = app.vault as unknown as VaultConfig;
+  if (vault.getConfig('useTab')) return '\t';
+  const tabSize = vault.getConfig('tabSize');
+  return ' '.repeat(typeof tabSize === 'number' && tabSize > 0 ? tabSize : 4);
+}
 
 /** Apply a LineEdit as ONE replaceRange (single undo step). */
 export function applyLineEdit(editor: Editor, edit: LineEdit): void {

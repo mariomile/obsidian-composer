@@ -110,6 +110,55 @@
   font-size: var(--font-ui-smaller);
 }
 
+/* ===== Composer — drag & drop ===== */
+body.composer-dragging,
+body.composer-dragging * {
+  cursor: grabbing;
+}
+.composer-drag-ghost {
+  position: fixed;
+  z-index: var(--layer-popover);
+  max-width: 320px;
+  padding: 5px 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--mv-r1, 6px);
+  box-shadow: var(--cosmos-pop-shadow, rgba(0, 0, 0, 0.28) 0px 12px 32px, rgba(0, 0, 0, 0.16) 0px 2px 8px);
+  pointer-events: none;
+}
+/* The lifted block reads as "in transit" while its ghost follows the cursor.
+   Opacity only — no layout property, so no reflow during the drag. */
+.composer-drag-source {
+  opacity: 0.4;
+  transition: opacity var(--composer-wash);
+}
+/* Hovering the block's own slot: dropping here changes nothing. Muted and
+   thinner so it reads as "put it back", not as a pending move. */
+.composer-drop-indicator.is-noop {
+  background: var(--text-faint);
+  opacity: 0.5;
+}
+.composer-drop-indicator {
+  position: fixed;
+  z-index: var(--layer-popover);
+  right: 8px;
+  height: 2px;
+  background: var(--interactive-accent);
+  border-radius: var(--mv-r1, 6px);
+  pointer-events: none;
+  transition: left var(--composer-wash), top var(--composer-wash);
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-drop-indicator {
+    transition: none;
+  }
+}
+
 /* ===== Composer — phone touch targets (mv-kit §2/§3) ===== */
 @media (pointer: coarse) {
   .composer-handle-btn {

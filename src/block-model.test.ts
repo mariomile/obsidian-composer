@@ -4,6 +4,7 @@ import { blockAtLine, fenceRanges, frontmatterRange } from './block-model.ts';
 import {
   turnInto, duplicateBlock, deleteBlock, moveBlock,
   ensureBlockId, insertionEdit, stripLine,
+  indentBlock, dropTargets, moveBlockTo,
 } from './block-model.ts';
 
 const doc = (s: string) => s.split('\n');
@@ -52,6 +53,15 @@ describe('blockAtLine', () => {
     assert.deepEqual(blockAtLine(doc('- item\n  cont\n- next'), 0), { startLine: 0, endLine: 1, type: 'list-item' });
     assert.deepEqual(blockAtLine(doc('- item\n  cont\n- next'), 1), { startLine: 0, endLine: 1, type: 'list-item' });
     assert.deepEqual(blockAtLine(doc('- item\n  cont\n- next'), 2), { startLine: 2, endLine: 2, type: 'list-item' });
+  });
+  it('list item absorbs a genuinely nested child bullet, stops at the next sibling', () => {
+    assert.deepEqual(blockAtLine(doc('- a\n  - a-child\n- b'), 0), { startLine: 0, endLine: 1, type: 'list-item' });
+    assert.deepEqual(blockAtLine(doc('- a\n  - a-child\n- b'), 1), { startLine: 1, endLine: 1, type: 'list-item' });
+    assert.deepEqual(blockAtLine(doc('- a\n  - a-child\n- b'), 2), { startLine: 2, endLine: 2, type: 'list-item' });
+  });
+  it('list item absorbs a multi-level nested subtree', () => {
+    const l = doc('- a\n  - a-child\n    - a-grandchild\n- b');
+    assert.deepEqual(blockAtLine(l, 0), { startLine: 0, endLine: 2, type: 'list-item' });
   });
   it('embed and hr are single-line blocks', () => {
     assert.equal(blockAtLine(doc('![[Note]]'), 0)?.type, 'embed');
@@ -123,6 +133,153 @@ describe('moveBlock', () => {
   });
   it('null at document edge', () => {
     assert.equal(moveBlock(l, { startLine: 0, endLine: 0, type: 'paragraph' }, 'up'), null);
+  });
+});
+
+describe('indentBlock', () => {
+  it('outdents to the enclosing parent\'s indent', () => {
+    const l = doc('- parent\n  - child');
+    const block = { startLine: 1, endLine: 1, type: 'list-item' as const };
+    assert.deepEqual(indentBlock(l, block, 'out', '  '),
+      { fromLine: 1, toLine: 1, insert: ['- child'] });
+  });
+  it('outdent at level 0 is invalid', () => {
+    const l = doc('- item');
+    const block = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    assert.equal(indentBlock(l, block, 'out', '  '), null);
+  });
+  it('indents under the preceding sibling, reusing an existing child indent', () => {
+    const l = doc('- a\n  - a-child\n- b');
+    const block = { startLine: 2, endLine: 2, type: 'list-item' as const };
+    assert.deepEqual(indentBlock(l, block, 'in', '  '),
+      { fromLine: 2, toLine: 2, insert: ['  - b'] });
+  });
+  it('indents under a childless sibling using the fallback unit', () => {
+    const l = doc('- a\n- b');
+    const block = { startLine: 1, endLine: 1, type: 'list-item' as const };
+    assert.deepEqual(indentBlock(l, block, 'in', '  '),
+      { fromLine: 1, toLine: 1, insert: ['  - b'] });
+  });
+  it('indent with no preceding sibling at the same level is invalid', () => {
+    const l = doc('- only');
+    const block = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    assert.equal(indentBlock(l, block, 'in', '  '), null);
+  });
+  it('moves the whole subtree together', () => {
+    const l = doc('- a\n- b\n  - b-child');
+    const block = { startLine: 1, endLine: 2, type: 'list-item' as const };
+    assert.deepEqual(indentBlock(l, block, 'in', '  '),
+      { fromLine: 1, toLine: 2, insert: ['  - b', '    - b-child'] });
+  });
+  it('non-list-item blocks are not indentable', () => {
+    const l = doc('plain text');
+    const block = { startLine: 0, endLine: 0, type: 'paragraph' as const };
+    assert.equal(indentBlock(l, block, 'in', '  '), null);
+  });
+  it('a blank line breaks the sibling/ancestor search', () => {
+    const l = doc('- a\n\n- b');
+    const block = { startLine: 2, endLine: 2, type: 'list-item' as const };
+    assert.equal(indentBlock(l, block, 'in', '  '), null);
+  });
+});
+
+describe('dropTargets', () => {
+  it('offers a gap before every block plus end-of-doc, INCLUDING the dragged block\'s own slot', () => {
+    // The own slot (line 2 here) is what makes a drag abandonable: without it
+    // the nearest gap is always elsewhere, so picking a block up forced a move.
+    const l = doc('one\n\ntwo\n\nthree');
+    const dragged = { startLine: 2, endLine: 2, type: 'paragraph' as const };
+    const targets = dropTargets(l, dragged, '  ');
+    assert.deepEqual(targets.map((t) => t.line), [0, 2, 4, 5]);
+  });
+  it('maxIndent is null next to non-list blocks', () => {
+    const l = doc('one\n\ntwo');
+    const dragged = { startLine: 2, endLine: 2, type: 'paragraph' as const };
+    const targets = dropTargets(l, dragged, '  ');
+    assert.equal(targets.find((t) => t.line === 0)!.maxIndent, null);
+  });
+  it('maxIndent is one level past the deepest line of a nested preceding subtree', () => {
+    const l = doc('- a\n  - a-child\n- b\n- c');
+    const dragged = { startLine: 3, endLine: 3, type: 'list-item' as const };
+    const targets = dropTargets(l, dragged, '  ');
+    assert.equal(targets.find((t) => t.line === 2)!.maxIndent, '    ');
+  });
+  it('maxIndent is one level past a flat (unnested) preceding item', () => {
+    const l = doc('- a\n- b\n- c');
+    const dragged = { startLine: 2, endLine: 2, type: 'list-item' as const };
+    const targets = dropTargets(l, dragged, '\t');
+    assert.equal(targets.find((t) => t.line === 1)!.maxIndent, '\t');
+  });
+  it('baseIndent matches the sibling context, so a plain drop keeps depth', () => {
+    // Dropping a child between two other children must keep it a child; the
+    // first version forced '' here and flattened every dragged item.
+    const l = doc('- one\n\t- a\n\t- b\n- two');
+    const dragged = { startLine: 3, endLine: 3, type: 'list-item' as const };
+    const targets = dropTargets(l, dragged, '\t');
+    assert.equal(targets.find((t) => t.line === 2)!.baseIndent, '\t');
+    assert.equal(targets.find((t) => t.line === 0)!.baseIndent, '');
+  });
+  it('exposes gaps BETWEEN nested siblings, not just top-level blocks', () => {
+    // Without this, a child can only ever leave its parent — it can never be
+    // reordered against its own siblings, which is most of what outline-style
+    // dragging is for.
+    const l = doc('- a\n\t- a1\n\t- a2\n- b');
+    const dragged = { startLine: 2, endLine: 2, type: 'list-item' as const };
+    const targets = dropTargets(l, dragged, '\t');
+    assert.deepEqual(targets.map((t) => t.line), [0, 1, 2, 3, 4]);
+  });
+  it('dropping a block back on its own slot changes nothing', () => {
+    const l = doc('one\n\ntwo\n\nthree');
+    const block = { startLine: 2, endLine: 2, type: 'paragraph' as const };
+    assert.equal(moveBlockTo(l, block, 2, null), null);
+    assert.equal(moveBlockTo(l, block, 3, null), null);
+  });
+});
+
+describe('moveBlockTo', () => {
+  it('moves a paragraph to the end, adding a canonical blank separator', () => {
+    const l = doc('one\n\ntwo\n\nthree');
+    const block = { startLine: 0, endLine: 0, type: 'paragraph' as const };
+    const r = moveBlockTo(l, block, 5, null)!;
+    assert.deepEqual(r.edit, { fromLine: 0, toLine: 4, insert: ['two', '', 'three', '', 'one'] });
+    assert.equal(r.cursorLine, 4);
+  });
+  it('reorders flat list items with no blank separators', () => {
+    const l = doc('- a\n- b\n- c');
+    const block = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    const r = moveBlockTo(l, block, 2, null)!;
+    // Edit is narrowed to the lines that actually changed — '- c' is untouched.
+    assert.deepEqual(r.edit, { fromLine: 0, toLine: 1, insert: ['- b', '- a'] });
+    assert.equal(r.cursorLine, 1);
+  });
+  it('re-indents the moved subtree when newIndent is given', () => {
+    const l = doc('- a\n- b\n  - b-child');
+    const block = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    const r = moveBlockTo(l, block, 3, '  ')!;
+    assert.deepEqual(r.edit, { fromLine: 0, toLine: 2, insert: ['- b', '  - b-child', '  - a'] });
+  });
+  it('leaves unrelated blank-line spacing untouched', () => {
+    // The whole-document rebuild this replaced silently collapsed every
+    // multi-blank gap in the note as a side effect of moving one block.
+    const l = doc('alpha\n\n\nbeta\n\n\ngamma');
+    const block = { startLine: 6, endLine: 6, type: 'paragraph' as const };
+    const r = moveBlockTo(l, block, 0, null)!;
+    const after = [...l];
+    after.splice(r.edit.fromLine, r.edit.toLine - r.edit.fromLine + 1, ...r.edit.insert);
+    assert.deepEqual(after.slice(0, 6), ['gamma', '', 'alpha', '', '', 'beta']);
+  });
+  it('reorders siblings inside a nested list', () => {
+    const l = doc('- a\n\t- a1\n\t- a2\n- b');
+    const block = { startLine: 2, endLine: 2, type: 'list-item' as const };
+    const r = moveBlockTo(l, block, 1, null)!;
+    const after = [...l];
+    after.splice(r.edit.fromLine, r.edit.toLine - r.edit.fromLine + 1, ...r.edit.insert);
+    assert.deepEqual(after, ['- a', '\t- a2', '\t- a1', '- b']);
+  });
+  it('null when the move would not change anything', () => {
+    const l = doc('- a\n- b');
+    const block = { startLine: 0, endLine: 0, type: 'list-item' as const };
+    assert.equal(moveBlockTo(l, block, 0, null), null);
   });
 });
 

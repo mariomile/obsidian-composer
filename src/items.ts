@@ -1,7 +1,7 @@
 import type { App, Editor, MarkdownView, TFile } from 'obsidian';
 import { Notice, normalizePath } from 'obsidian';
 import {
-  turnInto, duplicateBlock, deleteBlock, moveBlock, ensureBlockId,
+  turnInto, duplicateBlock, deleteBlock, moveBlock, indentBlock, ensureBlockId,
   type Block, type TurnTarget,
 } from './block-model.ts';
 import type { ComposerItem } from './menu-core.ts';
@@ -29,6 +29,9 @@ export interface ItemDeps {
   blockSnapshot: string[];
   where: 'above' | 'below';
   settings: ComposerSettings;
+  /** Fallback indent unit for Indent/re-indent when the target sibling has
+   *  no existing child to align with — sourced from the vault's own config. */
+  indentUnit: string;
 }
 
 interface CommandRegistry {
@@ -206,6 +209,13 @@ export function actionItems(deps: ItemDeps): ComposerItem[] {
     if (r) performEdit(deps.editor, r.edit, { line: r.cursorLine, ch: 0 });
   });
 
+  // Same indentBlock() the drag-and-drop path uses for its live preview and
+  // commit — menu and drag can never disagree about what a valid move is.
+  const indent = (dir: 'in' | 'out') => () => withBlock(deps, (lines, block) => {
+    const edit = indentBlock(lines, block, dir, deps.indentUnit);
+    if (edit) performEdit(deps.editor, edit, { line: block.startLine, ch: 0 });
+  });
+
   items.push(
     {
       id: 'move-up', label: 'Move up', icon: 'arrow-up', section: 'Actions',
@@ -216,6 +226,16 @@ export function actionItems(deps: ItemDeps): ComposerItem[] {
       id: 'move-down', label: 'Move down', icon: 'arrow-down', section: 'Actions',
       keywords: ['move', 'reorder', 'down'],
       run: move('down'),
+    },
+    {
+      id: 'indent', label: 'Indent', icon: 'indent', section: 'Actions',
+      keywords: ['indent', 'nest', 'outline'],
+      run: indent('in'),
+    },
+    {
+      id: 'outdent', label: 'Outdent', icon: 'outdent', section: 'Actions',
+      keywords: ['outdent', 'unindent', 'outline'],
+      run: indent('out'),
     },
     {
       id: 'duplicate', label: 'Duplicate', icon: 'copy', section: 'Actions',
