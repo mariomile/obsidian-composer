@@ -44,7 +44,7 @@ The handle only appears in Live Preview (desktop only) — it's inert in Reading
 | Template folder | `Resources/Templates` | Source folder for the Template section |
 | Artifact folder | `Resources/_artifacts` | Source folder for the HTML artifact embed section |
 | AI section | `on` | Show "Ask Exo" in the insert menu (requires the Exo plugin) |
-| Exo command id | `exo:inline-edit` | Command id Composer hands off to for "Ask Exo" |
+| Exo command id | `exo-agent:inline-edit` | Command id Composer hands off to for "Ask Exo" |
 
 ## Install (manual dev build)
 

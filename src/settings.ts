@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: ComposerSettings = {
   templateFolder: 'Resources/Templates',
   artifactFolder: 'Resources/_artifacts',
   aiEnabled: true,
-  exoCommandId: 'exo:inline-edit',
+  exoCommandId: 'exo-agent:inline-edit',
 };
 
 export class ComposerSettingTab extends PluginSettingTab {
