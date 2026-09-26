@@ -1,6 +1,6 @@
 {
   "name": "composer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Notion-style block handle (+ insert menu, block actions) and a right-edge document outline for Obsidian.",
   "main": "main.js",
   "type": "module",
