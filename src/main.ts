@@ -1,4 +1,4 @@
-import { MarkdownView, Plugin, type Editor } from 'obsidian';
+import { MarkdownView, Platform, Plugin, type Editor } from 'obsidian';
 import type { EditorView } from '@codemirror/view';
 import type { Text } from '@codemirror/state';
 import { blockAtLine, sectionBlock, type Block } from './block-model.ts';
@@ -9,6 +9,13 @@ import { vaultIndentUnit } from './actions.ts';
 import { DragController, type DragDeps } from './drag.ts';
 import type { ComposerItem } from './menu-core.ts';
 import { DEFAULT_SETTINGS, ComposerSettingTab, type ComposerSettings } from './settings.ts';
+import { OutlineModule } from './outline/outline-module.ts';
+import {
+  DEFAULT_OUTLINE_SETTINGS,
+  legacyOutlineDataPath,
+  parseLegacyOutlineSettings,
+  type OutlineSettings,
+} from './outline/outline-settings.ts';
 
 const HANDLE_WIDTH = 46;
 /** Assumed height of an embed widget's first "row", for centering the handle
@@ -33,9 +40,32 @@ export default class ComposerPlugin extends Plugin {
   private lastLine: number | null = null;
   private showTimer = 0;
   private lineCache: { doc: Text; lines: string[] } | null = null;
+  private outline: OutlineModule | null = null;
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const raw = (await this.loadData()) as Partial<ComposerSettings> | null;
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...raw,
+      outline: { ...DEFAULT_OUTLINE_SETTINGS, ...raw?.outline },
+    };
+    // First load after the Notion Outline merge: carry its settings over once.
+    // Saving right away writes an `outline` key, so this never runs again.
+    if (!raw?.outline) {
+      Object.assign(this.settings.outline, await this.readLegacyOutlineSettings());
+      await this.saveSettings();
+    }
+  }
+
+  private async readLegacyOutlineSettings(): Promise<Partial<OutlineSettings>> {
+    const adapter = this.app.vault.adapter;
+    const path = legacyOutlineDataPath(this.app.vault.configDir);
+    try {
+      if (!(await adapter.exists(path))) return {};
+      return parseLegacyOutlineSettings(await adapter.read(path));
+    } catch {
+      return {};
+    }
   }
 
   async saveSettings(): Promise<void> {
@@ -44,6 +74,28 @@ export default class ComposerPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.addSettingTab(new ComposerSettingTab(this.app, this));
+    this.setOutlineEnabled(this.settings.outline.enabled);
+    // The block handle is a hover UI (mousemove, mousedown-drag): on touch
+    // devices there is no hover and taps would synthesize stray mouse events,
+    // so it only loads on desktop. The outline works everywhere.
+    if (!Platform.isMobile) this.loadBlockHandle();
+  }
+
+  setOutlineEnabled(enabled: boolean): void {
+    if (enabled && !this.outline) {
+      this.outline = this.addChild(new OutlineModule(this.app, () => this.settings.outline));
+    } else if (!enabled && this.outline) {
+      this.removeChild(this.outline);
+      this.outline = null;
+    }
+  }
+
+  refreshOutline(): void {
+    this.outline?.refreshAll();
+  }
+
+  private loadBlockHandle(): void {
     this.handle = new GutterHandle({
       onPlus: (altKey) => this.openInsertMenu(altKey),
       onGrip: () => this.openActionsMenu(),
@@ -55,7 +107,6 @@ export default class ComposerPlugin extends Plugin {
     this.addChild(this.menu);
     this.drag = new DragController();
     this.addChild(this.drag);
-    this.addSettingTab(new ComposerSettingTab(this.app, this));
 
     this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
     // Scrolling the editor dismisses the handle/menu — but scrolling INSIDE

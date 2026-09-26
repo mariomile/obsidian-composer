@@ -3,7 +3,7 @@
   "name": "Composer",
   "version": "0.2.0",
   "minAppVersion": "1.10.0",
-  "description": "Notion-style block handle: + insert menu and block actions.",
+  "description": "Notion-style block handle (+ insert menu, block actions) and a right-edge document outline.",
   "author": "Mario Miletta",
-  "isDesktopOnly": true
+  "isDesktopOnly": false
 }

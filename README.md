@@ -2,6 +2,8 @@
 
 A Notion-style block handle for Obsidian: hover any block in Live Preview to reveal a gutter handle with a **＋ insert** menu and a **⠿ block actions** menu.
 
+It also docks a **document outline** to the right edge of every note: one tick per heading, expanding into a titled panel with live tracking of the heading you are reading. The outline was the standalone Notion Outline plugin, now merged into Composer.
+
 ![Composer insert menu](docs/menu.png)
 
 ![Composer block handle in a real note](docs/block-handle.png)
@@ -17,7 +19,15 @@ Empty lines get the handle too (＋ only): inserting there replaces the line in 
 
 Both menus support fuzzy filtering, arrow-key navigation, `Enter` to confirm, `Esc` to close, and close on outside click. All insertions are a single undo step.
 
-The handle only appears in Live Preview (desktop only) — it's inert in Reading view and does nothing over blank lines or frontmatter.
+The handle only appears in Live Preview on desktop. It's inert in Reading view and does nothing over blank lines or frontmatter.
+
+## Outline
+
+- **Resting tick strip**: thin ticks pinned to the right edge, one per heading. Tick length and opacity scale with heading level.
+- **Titled panel**: hover the strip (or tap it on touch) to expand a panel listing the headings, indented by level. Click a title to scroll there.
+- **Live tracking**: the heading you are reading is highlighted in the accent color as you scroll.
+- **Editing and reading view**: works in Live Preview, Source mode, and Reading view.
+- **Keyboard and touch**: the strip is a real button, `Esc` closes the panel, a tap outside dismisses it on touch.
 
 ## Insert menu sections
 
@@ -46,6 +56,17 @@ The handle only appears in Live Preview (desktop only) — it's inert in Reading
 | AI section | `on` | Show "Ask Exo" in the insert menu (requires the Exo plugin) |
 | Exo command id | `exo-agent:inline-edit` | Command id Composer hands off to for "Ask Exo" |
 
+**Outline**
+
+| Setting | Default | Description |
+|---|---|---|
+| Show outline | `on` | Turn the right-edge outline on or off |
+| Minimum headings | `2` | Hide the outline when a note has fewer headings than this |
+| Show in reading view | `on` | Also show the outline in Reading view |
+| Disable on mobile | `off` | Hide the outline on phone and tablet |
+
+Coming from Notion Outline? On first load Composer imports its settings from `.obsidian/plugins/notion-outline/data.json`. Disable the old plugin afterwards, or you get two outlines.
+
 ## Install (manual dev build)
 
 Composer is not on the community plugin store. To build and install it locally:
@@ -59,7 +80,7 @@ The build writes `main.js`, `manifest.json`, and `styles.css` into the plugin fo
 
 ## Mobile
 
-**Unsupported** — `isDesktopOnly: true` in `manifest.json`; the handle only appears in Live Preview and is desktop-only by design (see "How it works" above).
+**Supported.** Composer runs on phone and tablet: the outline works there (tap the strip to open the panel, tap a title to jump). The block handle is a hover interface, so it only loads on desktop.
 
 ## Design
 

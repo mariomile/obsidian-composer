@@ -1,5 +1,6 @@
 import { PluginSettingTab, Setting, type App } from 'obsidian';
 import type ComposerPlugin from './main.ts';
+import { DEFAULT_OUTLINE_SETTINGS, type OutlineSettings } from './outline/outline-settings.ts';
 
 export interface ComposerSettings {
   hoverDelayMs: number;
@@ -10,6 +11,7 @@ export interface ComposerSettings {
   artifactFolder: string;
   aiEnabled: boolean;
   exoCommandId: string;
+  outline: OutlineSettings;
 }
 
 export const DEFAULT_SETTINGS: ComposerSettings = {
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: ComposerSettings = {
   artifactFolder: 'Resources/_artifacts',
   aiEnabled: true,
   exoCommandId: 'exo-agent:inline-edit',
+  outline: { ...DEFAULT_OUTLINE_SETTINGS },
 };
 
 export class ComposerSettingTab extends PluginSettingTab {
@@ -30,6 +33,11 @@ export class ComposerSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+
+    new Setting(containerEl)
+      .setName('Block handle')
+      .setDesc('The hover handle with the + insert menu and block actions. Desktop only.')
+      .setHeading();
 
     new Setting(containerEl)
       .setName('Hover delay')
@@ -102,6 +110,62 @@ export class ComposerSettingTab extends PluginSettingTab {
         .onChange(async (v) => {
           this.plugin.settings.exoCommandId = v.trim();
           await this.plugin.saveSettings();
+        }));
+
+    this.displayOutline(containerEl);
+  }
+
+  private displayOutline(containerEl: HTMLElement): void {
+    const outline = this.plugin.settings.outline;
+    const save = async (): Promise<void> => {
+      await this.plugin.saveSettings();
+      this.plugin.refreshOutline();
+    };
+
+    new Setting(containerEl)
+      .setName('Outline')
+      .setDesc('Heading ticks docked to the right edge of the note, expanding into a titled panel.')
+      .setHeading();
+
+    new Setting(containerEl)
+      .setName('Show outline')
+      .addToggle((t) => t
+        .setValue(outline.enabled)
+        .onChange(async (v) => {
+          outline.enabled = v;
+          await this.plugin.saveSettings();
+          this.plugin.setOutlineEnabled(v);
+        }));
+
+    new Setting(containerEl)
+      .setName('Minimum headings')
+      .setDesc('Hide the outline when a note has fewer headings than this.')
+      .addText((t) => t
+        .setValue(String(outline.minHeadings))
+        .onChange(async (v) => {
+          const n = Number.parseInt(v, 10);
+          outline.minHeadings = Number.isFinite(n) && n > 0 ? n : DEFAULT_OUTLINE_SETTINGS.minHeadings;
+          await save();
+        }));
+
+    new Setting(containerEl)
+      .setName('Show in reading view')
+      .setDesc('Also show the outline in reading mode.')
+      .addToggle((t) => t
+        .setValue(outline.showInReadingView)
+        .onChange(async (v) => {
+          outline.showInReadingView = v;
+          await save();
+        }));
+
+    new Setting(containerEl)
+      .setName('Disable on mobile')
+      .setDesc('Hide the outline on phone and tablet, keep it on desktop.')
+      .addToggle((t) => t
+        .setValue(outline.disableOnMobile)
+        .onChange(async (v) => {
+          outline.disableOnMobile = v;
+          await save();
         }));
   }
 }
