@@ -199,6 +199,8 @@ body.composer-dragging * {
   align-items: center;
   justify-content: flex-end;
   pointer-events: none;
+  overflow: visible;
+  contain: none;
   z-index: var(--layer-popover, 30);
 }
 
@@ -306,6 +308,7 @@ body.composer-dragging * {
   padding: 3px 6px;
   border-radius: 4px;
   background: transparent;
+  justify-content: flex-start;
   text-align: left;
   cursor: pointer;
   white-space: normal;
@@ -323,6 +326,30 @@ body.composer-dragging * {
 .notion-outline__panel > button.notion-outline__row.is-active {
   color: var(--interactive-accent);
   font-weight: var(--font-semibold, 600);
+}
+
+/* Touch: the root is only as wide as the tick strip (~48px). Anything in the
+   host that clips it (mobile view containers, theme overflow rules) cut the
+   panel down to the strip width: rows showed only their last letters and the
+   box covered the text. While expanded, the root spans the whole view so the
+   panel lays out against the view, sized to fit a phone. */
+@media (hover: none) {
+  .notion-outline.is-expanded {
+    left: 0;
+  }
+
+  .notion-outline__panel {
+    width: min(280px, calc(100% - 24px));
+    min-width: 0;
+    max-width: none;
+    max-height: 60vh;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .notion-outline__panel > button.notion-outline__row {
+    min-height: 36px;
+    padding: 6px 8px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

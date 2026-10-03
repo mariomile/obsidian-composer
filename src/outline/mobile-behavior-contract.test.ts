@@ -55,3 +55,17 @@ describe('Composer runs on mobile', () => {
     assert.deepEqual(offenders, []);
   });
 });
+
+describe('touch panel is not clipped to the strip', () => {
+  const styles = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8');
+  const touch = styles.slice(styles.indexOf('@media (hover: none)'));
+
+  it('widens the root across the view while expanded on touch', () => {
+    assert.match(touch, /\.notion-outline\.is-expanded \{\s*left: 0;/);
+  });
+
+  it('sizes the panel to the viewport instead of a fixed min-width', () => {
+    assert.match(touch, /width: min\(280px, calc\(100% - 24px\)\);/);
+    assert.match(touch, /min-width: 0;/);
+  });
+});
