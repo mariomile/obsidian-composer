@@ -53,7 +53,7 @@ export class ComposerMenu extends Component {
     this.render('');
     this.el.show();
     this.visible = true;
-    computePosition(anchor, this.el, {
+    void computePosition(anchor, this.el, {
       placement: 'right-start',
       middleware: [offset(6), flip({ fallbackPlacements: ['left-start', 'bottom-start'] }), shift({ padding: 8 })],
     }).then(({ x, y }) => {

@@ -7,7 +7,7 @@ const outlineModule = readFileSync(new URL('./outline-module.ts', import.meta.ur
 const settings = readFileSync(new URL('./outline-settings.ts', import.meta.url), 'utf8');
 const settingsTab = readFileSync(new URL('../settings.ts', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../main.ts', import.meta.url), 'utf8');
-const manifest = JSON.parse(readFileSync(new URL('../../manifest.json', import.meta.url), 'utf8'));
+const manifest = JSON.parse(readFileSync(new URL('../../manifest.json', import.meta.url), 'utf8')) as { isDesktopOnly: boolean };
 
 describe('mobile tap does not skip the panel', () => {
   it('gates direct tick navigation behind hover support or an already-expanded panel', () => {
