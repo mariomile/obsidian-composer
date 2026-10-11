@@ -23,6 +23,8 @@ The handle only appears in Live Preview on desktop. It's inert in Reading view a
 
 ## Outline
 
+![Composer outline panel expanded next to a note](docs/outline.png)
+
 - **Resting tick strip**: thin ticks pinned to the right edge, one per heading. Tick length and opacity scale with heading level.
 - **Titled panel**: hover the strip (or tap it on touch) to expand a panel listing the headings, indented by level. Click a title to scroll there.
 - **Live tracking**: the heading you are reading is highlighted in the accent color as you scroll.
