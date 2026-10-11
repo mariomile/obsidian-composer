@@ -1,4 +1,4 @@
-import { MarkdownView } from "obsidian";
+import type { MarkdownView } from "obsidian";
 import { type Heading, tickGeometry } from "./heading-model.ts";
 import { activeHeadingIndex } from "./outline-tracking.ts";
 import { getHeadingTops, getScroller, scrollToHeading } from "./position-mapper.ts";
@@ -124,7 +124,7 @@ export class OutlineController {
 
   private scheduleUpdate(): void {
     if (this.rafId !== null) return;
-    this.rafId = requestAnimationFrame(() => {
+    this.rafId = window.requestAnimationFrame(() => {
       this.rafId = null;
       this.updateActive();
     });
@@ -237,7 +237,7 @@ export class OutlineController {
     this.strip.removeEventListener("click", this.onStripClick);
     document.removeEventListener("pointerdown", this.onOutsidePointer, true);
     if (this.collapseTimer) window.clearTimeout(this.collapseTimer);
-    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    if (this.rafId !== null) window.cancelAnimationFrame(this.rafId);
     this.root.remove();
   }
 }

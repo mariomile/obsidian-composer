@@ -1,4 +1,4 @@
-import { MarkdownView } from "obsidian";
+import type { MarkdownView } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import type { Heading } from "./heading-model.ts";
 
@@ -59,7 +59,7 @@ function alignReadingEls(
   headings: Heading[],
   els: HTMLElement[],
 ): (HTMLElement | null)[] {
-  const result: (HTMLElement | null)[] = new Array(headings.length).fill(null);
+  const result: (HTMLElement | null)[] = new Array<HTMLElement | null>(headings.length).fill(null);
   let ei = 0;
   for (let hi = 0; hi < headings.length && ei < els.length; hi++) {
     const el = els[ei];

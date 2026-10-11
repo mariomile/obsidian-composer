@@ -72,7 +72,7 @@ function listItemBlock(lines: string[], line: number): Block {
     // A more-indented list marker is a genuine nested child — absorb it (and
     // its own descendants, recursively via this same loop). Only a sibling
     // or shallower marker (nextIndent <= indent) ends the block.
-    const nextIndent = next.match(/^\s*/)![0]!.length;
+    const nextIndent = next.match(/^\s*/)![0].length;
     if (nextIndent <= indent) break;
     e++;
   }

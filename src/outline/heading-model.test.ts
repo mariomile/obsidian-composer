@@ -19,7 +19,7 @@ describe('normalizeHeadings', () => {
 
   it('returns [] when cache is null or has no headings', () => {
     assert.deepEqual(normalizeHeadings(null), []);
-    assert.deepEqual(normalizeHeadings({} as CachedMetadata), []);
+    assert.deepEqual(normalizeHeadings({}), []);
   });
 });
 
