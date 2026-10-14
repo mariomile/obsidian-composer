@@ -1,4 +1,4 @@
-import { Component, MarkdownView, Platform, debounce, type App, type TFile } from "obsidian";
+import { Component, MarkdownView, Platform, debounce, type App, type Debouncer, type TFile } from "obsidian";
 import { OutlineController } from "./outline-controller.ts";
 import { normalizeHeadings } from "./heading-model.ts";
 import type { OutlineSettings } from "./outline-settings.ts";
@@ -10,6 +10,8 @@ import type { OutlineSettings } from "./outline-settings.ts";
  */
 export class OutlineModule extends Component {
   private controllers = new Map<MarkdownView, OutlineController>();
+  /** One debouncer per view: a shared one would keep only the last view's call. */
+  private refreshers = new Map<MarkdownView, Debouncer<[], void>>();
 
   constructor(
     private app: App,
@@ -39,15 +41,11 @@ export class OutlineModule extends Component {
   }
 
   onunload(): void {
+    for (const r of this.refreshers.values()) r.cancel();
+    this.refreshers.clear();
     for (const c of this.controllers.values()) c.destroy();
     this.controllers.clear();
   }
-
-  private debouncedRefresh = debounce(
-    (view: MarkdownView) => this.refreshView(view),
-    150,
-    true,
-  );
 
   /** Ensure every visible markdown view has a controller; drop stale ones. */
   private syncControllers(): void {
@@ -58,12 +56,15 @@ export class OutlineModule extends Component {
         live.add(view);
         if (!this.controllers.has(view)) {
           this.controllers.set(view, new OutlineController(view));
+          this.refreshers.set(view, debounce(() => this.refreshView(view), 150, true));
         }
         this.refreshView(view);
       }
     }
     for (const [view, ctrl] of this.controllers) {
       if (!live.has(view)) {
+        this.refreshers.get(view)?.cancel();
+        this.refreshers.delete(view);
         ctrl.destroy();
         this.controllers.delete(view);
       }
@@ -85,8 +86,8 @@ export class OutlineModule extends Component {
   }
 
   private onMetaChanged(file: TFile): void {
-    for (const [view] of this.controllers) {
-      if (view.file?.path === file.path) this.debouncedRefresh(view);
+    for (const [view, refresh] of this.refreshers) {
+      if (view.file?.path === file.path) refresh();
     }
   }
 
